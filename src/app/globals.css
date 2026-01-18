@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --muted: #f7f4f2;
+  --accent: #0f172a; /* deep navy for text */
+  --soft-border: rgba(15, 23, 42, 0.06);
 }
 
 @theme inline {
@@ -23,4 +26,86 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Editorial phone-frame container used for mobile-first centered layout */
+.phone-frame {
+  width: min(420px, 92vw);
+  height: min(844px, 92vh);
+  max-height: 92vh;
+  border-radius: 28px;
+  background: linear-gradient(180deg, var(--muted), #ffffff);
+  box-shadow: 0 20px 50px rgba(12, 15, 20, 0.18);
+  border: 1px solid var(--soft-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable inner column for content inside the phone frame */
+.phone-frame .phone-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Refined editorial typography */
+.editorial-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: var(--accent);
+  line-height: 1.02;
+}
+
+.editorial-lead {
+  color: rgba(15,23,42,0.78);
+}
+
+/* Desktop / laptop adaptations: keep phone aesthetic on small screens,
+   but present a two-column, card-like layout on wider viewports. */
+@media (min-width: 1024px) {
+  .phone-frame {
+    width: min(1100px, 92vw);
+    height: auto;
+    max-height: none;
+    border-radius: 20px;
+    padding: 0; /* inner padding handled by phone-scroll */
+    display: block;
+    background: linear-gradient(180deg, var(--muted), #ffffff);
+    box-shadow: 0 30px 70px rgba(12, 15, 20, 0.12);
+  }
+
+  .phone-frame .phone-scroll {
+    overflow: visible;
+    padding: 36px;
+    display: block;
+    gap: 28px;
+  }
+
+  /* Generic product two-column layout used on product pages */
+  .product-layout {
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 28px;
+    align-items: center; /* center vertically for better symmetry */
+    padding-top: 48px; /* lower the visual position of the card */
+    padding-bottom: 48px;
+  }
+
+  /* For hero-like sections we want a wide layout as well */
+  .hero-layout {
+    display: grid;
+    grid-template-columns: 1fr 520px;
+    gap: 40px;
+    align-items: center;
+  }
+
+  /* Slightly lift the product image on desktop for emphasis */
+  .phone-frame .product-image-visual {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 40px rgba(12, 15, 20, 0.08);
+    border-radius: 20px;
+  }
 }

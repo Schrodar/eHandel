@@ -1,14 +1,15 @@
 import "./globals.css";
-
-export const metadata = {
-  title: "Tee Store",
-  description: "En superenkel e-handel (utkast)",
-};
+import { TransitionProvider } from "@/components/TransitionProvider";
+import { CartProvider } from "@/components/CartProvider";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="sv">
-      <body>{children}</body>
+      <body>
+        <CartProvider>
+          <TransitionProvider>{children}</TransitionProvider>
+        </CartProvider>
+      </body>
     </html>
   );
 }

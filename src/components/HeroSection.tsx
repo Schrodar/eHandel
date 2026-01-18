@@ -29,7 +29,7 @@ export function HeroSection({ onShopClick }: Props) {
             {/* Du hade ingen knapp kvar här, men om du vill lägga tillbaka en "Handla nu" */}
             <button
               onClick={onShopClick}
-              className="rounded-full bg-emerald-600 hover:bg-emerald-700 px-7 sm:px-8 py-3 font-semibold text-white transition"
+              className="rounded-full bg-black hover:bg-emerald-700 px-7 sm:px-8 py-3 font-semibold text-white transition"
             >
               Handla nu
             </button>
@@ -42,7 +42,7 @@ export function HeroSection({ onShopClick }: Props) {
           </div>
         </div>
 
-        {/* HÖGER */}
+        
         {/* HÖGER / Bild */}
         <div className="order-first lg:order-none rounded-[44px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
           <div className="relative h-[clamp(420px,68vh,820px)]">

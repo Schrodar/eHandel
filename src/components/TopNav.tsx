@@ -2,13 +2,15 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 
-type Props = {
-  totalQty: number;
-  onOpenCart: () => void;
-};
+type Props = {};
 
-export function TopNav({ totalQty, onOpenCart }: Props) {
+import { useCartContext } from "./CartProvider";
+
+export function TopNav(_props: Props) {
+  const { totalQty, openCart } = useCartContext();
+
   return (
     <header className="w-full">
       <div className="mx-auto max-w-6xl px-4 sm:px-8 pt-4 sm:pt-5">
@@ -59,15 +61,15 @@ export function TopNav({ totalQty, onOpenCart }: Props) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-8 text-sm font-semibold text-white/90">
-            <a className="hidden sm:inline hover:text-white" href="#shop">
+            <Link href="/product?c=vit" className="hover:text-white">
               Shop
-            </a>
+            </Link>
             <a className="hidden sm:inline hover:text-white" href="#info">
               Info
             </a>
 
             <button
-              onClick={onOpenCart}
+              onClick={openCart}
               className="rounded-full bg-white/20 hover:bg-white/30 border border-white/30 px-3 sm:px-4 py-2 transition"
             >
               Varukorg ({totalQty})
