@@ -11,21 +11,15 @@ export function ProductCard({
   onAdd: (p: Product) => void;
 }) {
   return (
-    <div className="rounded-3xl bg-white/70 backdrop-blur border border-white/40 shadow-sm p-6">
+    <article className="product-card">
       <div className="flex items-start justify-between gap-6">
         <div className="space-y-2">
-          <p className="text-sm font-semibold tracking-wide text-slate-700">
-            Limited drop
-          </p>
-          <h3 className="text-xl font-semibold tracking-tight text-slate-900">
-            {product.name}
-          </h3>
-          <p className="text-slate-700">
-            En mjuk, tung premium-tee. Sitter snyggt. Känns dyr.
-          </p>
+          <p className="text-sm font-semibold tracking-wide" style={{color:'var(--muted)'}}>Limited drop</p>
+          <h3 className="product-name">{product.name}</h3>
+          <p style={{color:'var(--muted)'}}>En mjuk, tung premium-tee. Sitter snyggt. Känns dyr.</p>
         </div>
 
-        <div className="relative h-28 w-28 shrink-0">
+        <div className="relative product-image shrink-0">
           <Image
             src={product.image}
             alt={product.name}
@@ -37,17 +31,15 @@ export function ProductCard({
       </div>
 
       <div className="mt-5 flex items-center justify-between">
-        <p className="text-lg font-semibold text-slate-900">
-          {product.priceSek} kr
-        </p>
+        <p className="product-price">{product.priceSek} kr</p>
 
         <button
           onClick={() => onAdd(product)}
-          className="rounded-full px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] transition"
+          className="btn-primary"
         >
           Lägg i varukorg
         </button>
       </div>
-    </div>
+    </article>
   );
 }

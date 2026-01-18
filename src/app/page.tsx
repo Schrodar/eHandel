@@ -6,7 +6,7 @@ import { HeroSection } from "../components/HeroSection";
 
 export default function Page() {
   return (
-    <div className="min-h-screen lg:h-screen bg-[#e9aeb7] overflow-x-hidden lg:overflow-hidden">
+    <div className="min-h-screen bg-[#f3f0ea] overflow-x-hidden">
       <TopNav />
 
       <HeroSection

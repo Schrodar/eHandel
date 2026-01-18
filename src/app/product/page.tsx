@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useCartContext } from "@/components/CartProvider";
 import { useState } from "react";
@@ -11,13 +11,26 @@ export default function ProductPage() {
   const router = useRouter();
   const initial = sp.get("c") === "vit" ? "vit" : "svart";
   const [color, setColor] = useState<string>(initial);
+  // direction: 1 => movement originates from/to the right
+  //           -1 => movement originates from/to the left
+  // For our behavior: white ('vit') should enter from right and black exit to right => direction = 1
+  //                  black ('svart') should enter from left and white exit to left => direction = -1
+  const [direction, setDirection] = useState<number>(initial === "vit" ? 1 : -1);
   const src = color === "vit" ? "/Tvit.png" : "/Tsvart.png";
   const { add, openCart } = useCartContext();
 
   function selectColor(col: string) {
+    // Set direction according to incoming color:
+    // vit  => 1  (incoming from right, outgoing to right)
+    // svart => -1 (incoming from left, outgoing to left)
+    setDirection(col === "vit" ? 1 : -1);
     setColor(col);
-    // update URL without adding history entry
-    router.replace(`/product?c=${col}`);
+    // update the URL without causing navigation/scroll
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("c", col);
+      window.history.replaceState(null, "", url.toString());
+    }
   }
 
   return (
@@ -26,22 +39,30 @@ export default function ProductPage() {
         <div className="phone-scroll">
           <section className="w-full px-4 pt-4 pb-8 product-layout">
         {/* Bild-container (mindre kort, större tröja, centrerad) */}
-        <div className="relative overflow-hidden rounded-[44px] border border-black/10 bg-[#f7f4ee] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.18)]">
+        <div className="relative overflow-hidden image-surface">
           <div className="relative h-[clamp(240px,36vh,380px)] lg:h-[60vh]">
-            <motion.div
-              layoutId="main-product-image"
-              className="absolute inset-0 flex items-center justify-center"
-              transition={{ type: "spring", stiffness: 220, damping: 26 }}
-            >
-              <Image
-                src={src}
-                alt="T-shirt"
-                width={620}
-                height={620}
-                priority
-                className="h-auto w-[90%] object-contain"
-              />
-            </motion.div>
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={color}
+                initial={{ x: direction === 1 ? '100%' : '-100%' }}
+                animate={{ x: 0 }}
+                // outgoing moves in the same horizontal direction as incoming,
+                // so use the same sign for exit as initial per spec
+                exit={{ x: direction === 1 ? '100%' : '-100%' }}
+                transition={{ duration: 0.6, ease: 'easeInOut' }}
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ willChange: 'transform' }}
+              >
+                <Image
+                  src={src}
+                  alt="T-shirt"
+                  width={620}
+                  height={620}
+                  priority
+                  className="h-auto w-[90%] object-contain"
+                />
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
 
