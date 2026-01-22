@@ -2,9 +2,9 @@
 
 :root {
   /* Core color tokens */
-  --bg: #F3F0EA; /* match product page warm background */
+  --bg: #f3f0ea; /* match product page warm background */
   --surface: #FBF9F6; /* warm surface for cards */
-  --surface-soft: #F8F6F3; /* subtle tonal surface for image wells */
+  --surface-soft: #f7f4ee; /* subtle tonal surface for image wells */
   --muted: #A8ADA8; /* soft warm gray for secondary text */
   --text: #222226; /* primary text */
   --accent: #C76C60; /* muted terracotta (primary CTA) */
@@ -184,9 +184,10 @@ body {
 
 /* Image well: soft tonal surface with rounded corners and gentle shadow */
 .image-surface {
-  background: var(--surface-soft);
-  border-radius: 20px;
-  box-shadow: 0 12px 30px rgba(20,20,20,0.04);
+  background: #f7f4ee;
+  border-radius: 44px;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: 0 20px 40px -20px rgba(0,0,0,0.18);
   overflow: hidden;
 }
 
@@ -210,7 +211,7 @@ body {
     border-radius: 20px;
     padding: 0; /* inner padding handled by phone-scroll */
     display: block;
-    background: linear-gradient(180deg, var(--muted), #ffffff);
+    background: #f7f4ee;
     box-shadow: 0 30px 70px rgba(12, 15, 20, 0.12);
   }
 

@@ -1,12 +1,9 @@
-"use client";
+'use client';
 
-import type { Product } from "./products";
+import type { Product } from './products';
+import { formatPrice } from './products';
 
 type CartItem = { product: Product; qty: number };
-
-function formatSek(n: number) {
-  return `${n} kr`;
-}
 
 export function CartDrawer({
   open,
@@ -18,10 +15,13 @@ export function CartDrawer({
   open: boolean;
   onClose: () => void;
   items: CartItem[];
-  setQty: (id: Product["id"], qty: number) => void;
+  setQty: (id: Product['id'], qty: number) => void;
   onCheckout: () => void;
 }) {
-  const total = items.reduce((sum, it) => sum + it.product.priceSek * it.qty, 0);
+  const totalInOre = items.reduce(
+    (sum, it) => sum + it.product.priceInOre * it.qty,
+    0,
+  );
 
   return (
     <>
@@ -29,18 +29,20 @@ export function CartDrawer({
       <div
         onClick={onClose}
         className={[
-          "fixed inset-0 bg-black/30 transition-opacity",
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
-        ].join(" ")}
+          'fixed inset-0 bg-black/30 transition-opacity',
+          open
+            ? 'opacity-100 pointer-events-auto'
+            : 'opacity-0 pointer-events-none',
+        ].join(' ')}
       />
 
       {/* Drawer */}
       <aside
         className={[
-          "fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl border-l border-slate-200",
-          "transition-transform",
-          open ? "translate-x-0" : "translate-x-full",
-        ].join(" ")}
+          'fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl border-l border-slate-200',
+          'transition-transform',
+          open ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <h2 className="text-lg font-semibold">Varukorg</h2>
@@ -63,20 +65,26 @@ export function CartDrawer({
                   className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4"
                 >
                   <div>
-                    <p className="font-semibold text-slate-900">{it.product.name}</p>
+                    <p className="font-semibold text-slate-900">
+                      {it.product.name}
+                    </p>
                     <p className="text-sm text-slate-600">
-                      {formatSek(it.product.priceSek)} / st
+                      {formatPrice(it.product.priceInOre)} / st
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setQty(it.product.id, Math.max(0, it.qty - 1))}
+                      onClick={() =>
+                        setQty(it.product.id, Math.max(0, it.qty - 1))
+                      }
                       className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 font-semibold"
                     >
                       −
                     </button>
-                    <span className="w-6 text-center font-semibold">{it.qty}</span>
+                    <span className="w-6 text-center font-semibold">
+                      {it.qty}
+                    </span>
                     <button
                       onClick={() => setQty(it.product.id, it.qty + 1)}
                       className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 font-semibold"
@@ -89,7 +97,9 @@ export function CartDrawer({
 
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                 <p className="text-slate-700 font-semibold">Totalt</p>
-                <p className="text-slate-900 font-semibold">{formatSek(total)}</p>
+                <p className="text-slate-900 font-semibold">
+                  {formatPrice(totalInOre)}
+                </p>
               </div>
 
               <button

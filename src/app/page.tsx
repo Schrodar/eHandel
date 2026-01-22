@@ -1,22 +1,15 @@
 // app/page.tsx
-"use client";
+'use client';
 
-import { TopNav } from "../components/TopNav";
-import { HeroSection } from "../components/HeroSection";
+import { TopNav } from '../components/TopNav';
+import { HeroSection } from '../components/HeroSection';
 
 export default function Page() {
   return (
-    <div className="min-h-screen bg-[#f3f0ea] overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen bg-[#e9aeb7] overflow-x-hidden lg:overflow-hidden">
       <TopNav />
 
-      <HeroSection
-        onShopClick={() =>
-          document.getElementById("shop")?.scrollIntoView({ behavior: "smooth" })
-        }
-      />
-
-      {/* placeholder så länken #shop inte dör */}
-      <div id="shop" className="hidden" />
+      <HeroSection />
     </div>
   );
 }

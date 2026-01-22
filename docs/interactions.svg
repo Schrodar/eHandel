@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900">
+  <style>
+    .box{fill:#fff;stroke:#0f172a;stroke-width:1.2;rx:10}
+    .service{fill:#f1f5f9;stroke:#0b74ff;stroke-width:1}
+    .text{font-family: Inter, Arial, Helvetica, sans-serif; font-size:14px; fill:#0f172a}
+    .title{font-weight:700; font-size:16px}
+    .arrow{fill:none;stroke:#0f172a;stroke-width:1.6;marker-end:url(#arrow)}
+  </style>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <text class="text title" x="40" y="40">Komponentinteraktioner</text>
+
+  <!-- UI components -->
+  <rect class="box" x="60" y="80" width="240" height="90" />
+  <text class="text" x="80" y="110">`TopNav`</text>
+  <text class="text" x="80" y="130">Visar kundvagnsknapp / öppnar Drawer</text>
+
+  <rect class="box" x="60" y="200" width="320" height="120" />
+  <text class="text" x="80" y="230">`ProductCard`</text>
+  <text class="text" x="80" y="250">Lägger till artiklar → anropar `useCart`</text>
+
+  <rect class="box" x="520" y="140" width="300" height="140" />
+  <text class="text" x="540" y="170">`CartDrawer`</text>
+  <text class="text" x="540" y="190">Visar items, totalsumma, checkout</text>
+
+  <rect class="box" x="520" y="320" width="300" height="110" />
+  <text class="text" x="540" y="350">`CheckoutModal`</text>
+  <text class="text" x="540" y="370">Checkout-flöde / Klarna-integration</text>
+
+  <rect class="box" x="980" y="200" width="320" height="140" />
+  <text class="text" x="1000" y="230">`CartProvider`</text>
+  <text class="text" x="1000" y="250">Håller state: items, totals, metoder</text>
+
+  <rect class="box" x="980" y="380" width="320" height="90" />
+  <text class="text" x="1000" y="410">`orderStore`</text>
+  <text class="text" x="1000" y="430">Persistens / API-anrop</text>
+
+  <!-- arrows -->
+  <path class="arrow" d="M300 130 L520 200" />
+  <path class="arrow" d="M380 260 L520 240" />
+  <path class="arrow" d="M640 180 L980 260" />
+  <path class="arrow" d="M640 360 L980 320" />
+  <path class="arrow" d="M1160 320 L1160 380" />
+
+  <text class="text muted" x="40" y="860">Genererad interaktionsdiagram — plats: docs/interactions.svg</text>
+</svg>

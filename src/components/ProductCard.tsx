@@ -1,7 +1,8 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import type { Product } from "./products";
+import Image from 'next/image';
+import type { Product } from './products';
+import { formatPrice } from './products';
 
 export function ProductCard({
   product,
@@ -14,9 +15,16 @@ export function ProductCard({
     <article className="product-card">
       <div className="flex items-start justify-between gap-6">
         <div className="space-y-2">
-          <p className="text-sm font-semibold tracking-wide" style={{color:'var(--muted)'}}>Limited drop</p>
+          <p
+            className="text-sm font-semibold tracking-wide"
+            style={{ color: 'var(--muted)' }}
+          >
+            Limited drop
+          </p>
           <h3 className="product-name">{product.name}</h3>
-          <p style={{color:'var(--muted)'}}>En mjuk, tung premium-tee. Sitter snyggt. Känns dyr.</p>
+          <p style={{ color: 'var(--muted)' }}>
+            En mjuk, tung premium-tee. Sitter snyggt. Känns dyr.
+          </p>
         </div>
 
         <div className="relative product-image shrink-0">
@@ -31,12 +39,9 @@ export function ProductCard({
       </div>
 
       <div className="mt-5 flex items-center justify-between">
-        <p className="product-price">{product.priceSek} kr</p>
+        <p className="product-price">{formatPrice(product.priceInOre)}</p>
 
-        <button
-          onClick={() => onAdd(product)}
-          className="btn-primary"
-        >
+        <button onClick={() => onAdd(product)} className="btn-primary">
           Lägg i varukorg
         </button>
       </div>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <style>
+    .card{fill:#ffffff;stroke:#0f172a;stroke-width:1.2;rx:8}
+    .folder{fill:#eef2ff;stroke:#3730a3;stroke-width:1}
+    .text{font-family: Inter, Arial, Helvetica, sans-serif; font-size:13px; fill:#0f172a}
+    .title{font-weight:700; font-size:16px}
+    .muted{fill:#475569}
+  </style>
+
+  <!-- Header -->
+  <rect x="24" y="16" width="1152" height="96" class="card" />
+  <text class="text title" x="48" y="48">eHandel — Projektstruktur</text>
+  <text class="text muted" x="48" y="72">Root: package.json · next.config.ts · ARCHITECTURE.md · README.md</text>
+
+  <!-- src container -->
+  <rect x="40" y="128" width="1120" height="560" class="folder" />
+  <text class="text title" x="64" y="156">src/</text>
+
+  <!-- app column -->
+  <rect x="72" y="192" width="300" height="432" class="card" />
+  <text class="text title" x="92" y="224">app/</text>
+  <text class="text" x="92" y="248">globals.css</text>
+  <text class="text" x="92" y="268">layout.tsx</text>
+  <text class="text" x="92" y="288">page.tsx</text>
+  <text class="text" x="92" y="308">product/page.tsx</text>
+
+  <!-- components column -->
+  <rect x="400" y="192" width="360" height="432" class="card" />
+  <text class="text title" x="420" y="224">components/</text>
+  <text class="text" x="420" y="248">TopNav.tsx</text>
+  <text class="text" x="420" y="268">CartDrawer.tsx</text>
+  <text class="text" x="420" y="288">ProductCard.tsx</text>
+  <text class="text" x="420" y="308">CheckoutModal.tsx</text>
+  <text class="text" x="420" y="328">HeroSection.tsx</text>
+  <text class="text" x="420" y="348">TransitionProvider.tsx</text>
+  <text class="text" x="420" y="368">products.ts</text>
+  <text class="text" x="420" y="388">checkout.ts</text>
+
+  <!-- context column -->
+  <rect x="788" y="192" width="320" height="200" class="card" />
+  <text class="text title" x="808" y="224">context/</text>
+  <text class="text" x="808" y="248">CartProvider.tsx</text>
+
+  <!-- hooks & lib -->
+  <rect x="788" y="420" width="320" height="200" class="card" />
+  <text class="text title" x="808" y="452">hooks/ · lib/</text>
+  <text class="text" x="808" y="476">useCart.ts</text>
+  <text class="text" x="808" y="496">orderStore.ts</text>
+
+  <!-- footer note -->
+  <text class="text muted" x="48" y="700">Genererad strukturdiagram — plats: docs/structure.svg</text>
+</svg>
