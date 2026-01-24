@@ -1,0 +1,7 @@
+[
+  { "id": "linen", "name": "Linen" },
+  { "id": "cotton", "name": "Cotton" },
+  { "id": "denim", "name": "Denim" },
+  { "id": "wool", "name": "Wool" },
+  { "id": "polyester", "name": "Polyester" }
+]

@@ -11,7 +11,7 @@ export function HeroSection() {
         {/* VÄNSTER */}
         <div className="h-full flex flex-col">
           <div className="space-y-6">
-            <h1 className="text-[32px] sm:text-[46px] lg:text-[56px] leading-[1.0] font-extrabold tracking-tight text-white">
+            <h1 className="text-[32px] sm:text-[46px] lg:text-[56px] leading-none font-extrabold tracking-tight text-white">
               T-shirt, no cap
               <br />
               jag är drip i basic format
@@ -40,7 +40,7 @@ export function HeroSection() {
         </div>
 
         {/* HÖGER / Bild */}
-        <div className="order-first lg:order-none rounded-[44px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
+        <div className="order-first lg:order-0 rounded-[44px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
           <div className="relative h-[clamp(420px,68vh,820px)]">
             <Image
               src="/boy.png"

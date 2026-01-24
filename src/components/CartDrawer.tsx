@@ -39,7 +39,7 @@ export function CartDrawer({
       {/* Drawer */}
       <aside
         className={[
-          'fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl border-l border-slate-200',
+          'fixed right-0 top-0 h-full w-105 bg-white shadow-2xl border-l border-slate-200',
           'transition-transform',
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}

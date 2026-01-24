@@ -1,0 +1,62 @@
+[
+  {
+    "id": "w-001",
+    "title": "Linen Shirt",
+    "slug": "linen-shirt",
+    "description": "A lightweight linen shirt for warm days.",
+    "category_id": "tops",
+    "material_id": "linen",
+    "season": "summer",
+    "price_in_cents": 7900,
+    "price_class": "mid",
+    "active": true
+  },
+  {
+    "id": "w-002",
+    "title": "Pleated Skirt",
+    "slug": "pleated-skirt",
+    "description": "A flowing pleated skirt with soft drape.",
+    "category_id": "bottoms",
+    "material_id": "cotton",
+    "season": "spring",
+    "price_in_cents": 5900,
+    "price_class": "low",
+    "active": true
+  },
+  {
+    "id": "w-003",
+    "title": "Denim Jacket",
+    "slug": "denim-jacket",
+    "description": "Classic denim jacket with a relaxed fit.",
+    "category_id": "outerwear",
+    "material_id": "denim",
+    "season": "fall",
+    "price_in_cents": 12900,
+    "price_class": "high",
+    "active": true
+  },
+  {
+    "id": "w-004",
+    "title": "Wool Trousers",
+    "slug": "wool-trousers",
+    "description": "Tailored trousers in fine wool.",
+    "category_id": "bottoms",
+    "material_id": "wool",
+    "season": "winter",
+    "price_in_cents": 9900,
+    "price_class": "mid",
+    "active": true
+  },
+  {
+    "id": "w-005",
+    "title": "Cotton Tee",
+    "slug": "cotton-tee",
+    "description": "Everyday cotton tee, soft and breathable.",
+    "category_id": "tops",
+    "material_id": "cotton",
+    "season": "all",
+    "price_in_cents": 2900,
+    "price_class": "low",
+    "active": true
+  }
+]

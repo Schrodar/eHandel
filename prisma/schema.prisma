@@ -1,0 +1,77 @@
+// prisma/schema.prisma
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// Using strings for priceClass and season for initial flexible seeding
+
+model Color {
+    id   String  @id
+    name String
+    hex  String?
+
+    variants ProductVariant[]
+}
+
+model Category {
+    id   String @id
+    name String
+
+    products Product[]
+}
+
+model Material {
+    id   String @id
+    name String
+
+    products Product[]
+}
+
+model Product {
+    id          String   @id // stable string id from JSON (e.g. "w-001")
+    slug        String   @unique // stable unique slug for URLs/SEO
+    name        String
+    description String?
+    categoryId  String
+    category    Category @relation(fields: [categoryId], references: [id])
+
+    materialId String
+    material   Material @relation(fields: [materialId], references: [id])
+
+    priceInCents Int
+    priceClass   String @default("standard")
+    season       String @default("all")
+
+    canonicalImage String?
+    attributes     Json?
+    published      Boolean @default(true)
+
+    variants ProductVariant[]
+
+    @@index([categoryId])
+    @@index([materialId])
+}
+
+model ProductVariant {
+    id        String  @id // stable string id from JSON, or you can use sku as id later
+    sku       String  @unique // REQUIRED for commerce
+    productId String
+    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+    colorId String?
+    color   Color?  @relation(fields: [colorId], references: [id])
+
+    images       Json? // keep flexible for now (array of image paths/objects)
+    priceInCents Int? // optional override; fallback to Product.priceInCents in app
+    stock        Int     @default(0) // explicit stock (0 = out of stock)
+    attributes   Json?
+    active       Boolean @default(true)
+
+    @@index([productId])
+    @@index([colorId])
+}

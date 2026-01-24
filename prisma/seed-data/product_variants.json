@@ -1,0 +1,68 @@
+[
+  {
+    "id": "w-001-white",
+    "product_id": "w-001",
+    "sku": "W001-WHT",
+    "color_id": "white",
+    "images": ["/product-w-001.svg"],
+    "price_in_cents": null,
+    "stock": 120,
+    "attributes": { "fit": "regular" },
+    "active": true
+  },
+  {
+    "id": "w-001-black",
+    "product_id": "w-001",
+    "sku": "W001-BLK",
+    "color_id": "black",
+    "images": ["/product-w-001.svg"],
+    "price_in_cents": null,
+    "stock": 60,
+    "attributes": { "fit": "regular" },
+    "active": true
+  },
+  {
+    "id": "w-002-beige",
+    "product_id": "w-002",
+    "sku": "W002-BEI",
+    "color_id": "beige",
+    "images": ["/product-w-002.svg"],
+    "price_in_cents": null,
+    "stock": 40,
+    "attributes": { "fit": "boxy" },
+    "active": true
+  },
+  {
+    "id": "w-003-blue",
+    "product_id": "w-003",
+    "sku": "W003-BLU",
+    "color_id": "blue",
+    "images": ["/product-w-003.svg"],
+    "price_in_cents": null,
+    "stock": 50,
+    "attributes": { "fit": "slim" },
+    "active": true
+  },
+  {
+    "id": "w-004-black",
+    "product_id": "w-004",
+    "sku": "W004-BLK",
+    "color_id": "black",
+    "images": ["/product-w-004.svg"],
+    "price_in_cents": null,
+    "stock": 20,
+    "attributes": { "fit": "regular" },
+    "active": true
+  },
+  {
+    "id": "w-005-green",
+    "product_id": "w-005",
+    "sku": "W005-GRN",
+    "color_id": "green",
+    "images": ["/product-w-005.svg"],
+    "price_in_cents": null,
+    "stock": 80,
+    "attributes": { "fit": "regular" },
+    "active": true
+  }
+]

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "w-001",
+    "name": "Classic Tee",
+    "slug": "classic-tee",
+    "description": "Minimalist tee with premium hand-feel.",
+    "category_id": "tops",
+    "price_in_cents": 39900,
+    "price_class": "standard",
+    "season": "all",
+    "canonical_image": "/product-w-001.svg",
+    "attributes": { "care": "machine wash" },
+    "published": true
+  },
+  {
+    "id": "w-002",
+    "name": "Boxy Shirt",
+    "slug": "boxy-shirt",
+    "description": "Light linen boxy shirt.",
+    "category_id": "tops",
+    "price_in_cents": 69900,
+    "price_class": "standard",
+    "season": "summer",
+    "canonical_image": "/product-w-002.svg",
+    "attributes": {},
+    "published": true
+  },
+  {
+    "id": "w-003",
+    "name": "Slim Jeans",
+    "slug": "slim-jeans",
+    "description": "Premium slim denim.",
+    "category_id": "bottoms",
+    "price_in_cents": 99900,
+    "price_class": "premium",
+    "season": "all",
+    "canonical_image": "/product-w-003.svg",
+    "attributes": {},
+    "published": true
+  },
+  {
+    "id": "w-004",
+    "name": "Light Jacket",
+    "slug": "light-jacket",
+    "description": "Lightweight everyday jacket.",
+    "category_id": "outerwear",
+    "price_in_cents": 129900,
+    "price_class": "premium",
+    "season": "autumn",
+    "canonical_image": "/product-w-004.svg",
+    "attributes": {},
+    "published": true
+  },
+  {
+    "id": "w-005",
+    "name": "Summer Shorts",
+    "slug": "summer-shorts",
+    "description": "Casual summer shorts.",
+    "category_id": "bottoms",
+    "price_in_cents": 34900,
+    "price_class": "budget",
+    "season": "summer",
+    "canonical_image": "/product-w-005.svg",
+    "attributes": {},
+    "published": true
+  }
+]
