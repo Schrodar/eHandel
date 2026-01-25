@@ -5,8 +5,6 @@ import { useState } from 'react';
 import type { CustomerInfo } from './checkout';
 import { validateCheckoutRequest, createCheckoutRequest } from './checkout';
 import { useCartContext } from '@/context/CartProvider';
-import { calculateOrderTotal } from './products';
-import { formatPrice } from './products';
 
 type Props = {
   open: boolean;
@@ -23,8 +21,15 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
   if (!open) return null;
 
-  // Beräkna totalsumma
-  const orderTotal = calculateOrderTotal(items);
+  function formatPriceSek(amountSek: number): string {
+    return `${amountSek.toFixed(0)} kr`;
+  }
+
+  // Beräkna totalsumma i SEK
+  const totalInclVatSek = items.reduce(
+    (sum, item) => sum + item.product.price * item.qty,
+    0,
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +61,7 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
     // I produktion: skicka checkoutRequest till server
     console.log('Checkout Request:', checkoutRequest);
-    console.log('Order Total:', orderTotal);
+    console.log('Order Total SEK:', totalInclVatSek);
 
     // Skicka vidare till parent
     onSubmit(customer);
@@ -93,7 +98,7 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
                   {item.product.name} × {item.qty}
                 </span>
                 <span className="text-slate-900 font-medium">
-                  {formatPrice(item.product.priceInOre * item.qty)}
+                  {formatPriceSek(item.product.price * item.qty)}
                 </span>
               </div>
             ))}
@@ -103,12 +108,9 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
               Totalt (inkl. moms)
             </span>
             <span className="font-bold text-slate-900">
-              {formatPrice(orderTotal.totalInclVatOre)}
+              {formatPriceSek(totalInclVatSek)}
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Varav moms: {formatPrice(orderTotal.totalVatOre)}
-          </p>
         </div>
 
         {errors.length > 0 && (

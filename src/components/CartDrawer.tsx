@@ -1,9 +1,12 @@
 'use client';
 
-import type { Product } from './products';
-import { formatPrice } from './products';
+import type { WardrobeProduct } from '@/lib/wardrobeApi';
 
-type CartItem = { product: Product; qty: number };
+type CartItem = { product: WardrobeProduct; qty: number };
+
+function formatPriceSek(amountSek: number): string {
+  return `${amountSek.toFixed(0)} kr`;
+}
 
 export function CartDrawer({
   open,
@@ -15,11 +18,11 @@ export function CartDrawer({
   open: boolean;
   onClose: () => void;
   items: CartItem[];
-  setQty: (id: Product['id'], qty: number) => void;
+  setQty: (id: string, qty: number) => void;
   onCheckout: () => void;
 }) {
   const totalInOre = items.reduce(
-    (sum, it) => sum + it.product.priceInOre * it.qty,
+    (sum, it) => sum + it.product.price * it.qty,
     0,
   );
 
@@ -69,7 +72,7 @@ export function CartDrawer({
                       {it.product.name}
                     </p>
                     <p className="text-sm text-slate-600">
-                      {formatPrice(it.product.priceInOre)} / st
+                      {formatPriceSek(it.product.price)} / st
                     </p>
                   </div>
 
@@ -98,7 +101,7 @@ export function CartDrawer({
               <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                 <p className="text-slate-700 font-semibold">Totalt</p>
                 <p className="text-slate-900 font-semibold">
-                  {formatPrice(totalInOre)}
+                    {formatPriceSek(totalInOre)}
                 </p>
               </div>
 

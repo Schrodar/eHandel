@@ -1,13 +1,4 @@
 /**
- * CHECKOUT TYPES
- *
- * Definitioner för checkout-processen.
- * Säkerställer att data skickas korrekt till server.
- */
-
-import type { ProductId } from './products';
-
-/**
  * Kunduppgifter som krävs vid checkout
  */
 export type CustomerInfo = {
@@ -28,6 +19,13 @@ export type CustomerInfo = {
   /** Land - låst till SE initialt */
   country: 'SE';
 };
+
+/**
+ * Produkt-ID i checkoutflödet.
+ *
+ * För riktiga produkter använder vi produktens ID/slug från databasen.
+ */
+export type ProductId = string;
 
 /**
  * Orderrad - vad klienten skickar till server

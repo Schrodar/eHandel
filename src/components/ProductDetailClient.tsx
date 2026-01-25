@@ -101,7 +101,7 @@ export default function ProductDetailClient({
 
                 <button
                   onClick={() => {
-                    add(product.id);
+                    add(product);
                     openCart();
                   }}
                   className="mt-5 h-12 w-full rounded-full bg-black text-sm font-medium text-white active:scale-[0.99]"

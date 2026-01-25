@@ -23,9 +23,8 @@ export function HeroSection() {
               Dop start kit.
             </p>
 
-            {/* Du hade ingen knapp kvar här, men om du vill lägga tillbaka en "Handla nu" */}
             <Link
-              href="/product"
+              href="/shop"
               className="rounded-full bg-black hover:bg-emerald-700 px-7 sm:px-8 py-3 font-semibold text-white transition inline-block text-center"
             >
               Handla nu
