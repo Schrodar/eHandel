@@ -66,7 +66,7 @@ export function TopNav(_props: Props) {
 
           <div className="flex items-center gap-6 text-sm font-semibold">
             <Link
-              href="/product?c=vit"
+              href="/shop"
               className="hover:opacity-90"
               style={{ color: 'var(--accent-2)' }}
             >

@@ -5,7 +5,6 @@ import { useState } from 'react';
 import type { CustomerInfo } from './checkout';
 import { validateCheckoutRequest, createCheckoutRequest } from './checkout';
 import { useCartContext } from '@/context/CartProvider';
-import { calculateOrderTotal } from './products';
 import { formatPrice } from './products';
 
 type Props = {
@@ -23,8 +22,23 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
   if (!open) return null;
 
-  // Beräkna totalsumma
-  const orderTotal = calculateOrderTotal(items);
+  // Beräkna totalsumma lokalt från cart items (öre)
+  const orderTotal = items.reduce(
+    (acc, it) => {
+      const unit = it.unitPrice;
+      const qty = it.quantity;
+      const lineTotal = unit * qty;
+      const divisor = 10000 + (it.taxRate ?? 2500);
+      const lineExVat = Math.round((lineTotal * 10000) / divisor);
+      const lineVat = lineTotal - lineExVat;
+      acc.totalInclVatOre += lineTotal;
+      acc.totalExVatOre += lineExVat;
+      acc.totalVatOre += lineVat;
+      acc.lineItems.push({ product: it as any, quantity: qty, lineTotal, lineVat });
+      return acc;
+    },
+    { totalInclVatOre: 0, totalExVatOre: 0, totalVatOre: 0, lineItems: [] as any[] },
+  );
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,7 +56,7 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
     };
 
     // Skapa checkout request
-    const checkoutRequest = createCheckoutRequest(cart, customer);
+    const checkoutRequest = createCheckoutRequest(cart as any, customer);
 
     // Validera
     const validation = validateCheckoutRequest(checkoutRequest);
@@ -85,15 +99,12 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
           <p className="text-sm font-semibold text-slate-700">Din order</p>
           <div className="mt-2 space-y-1">
             {items.map((item) => (
-              <div
-                key={item.product.id}
-                className="flex justify-between text-sm"
-              >
+              <div key={item.sku} className="flex justify-between text-sm">
                 <span className="text-slate-600">
-                  {item.product.name} × {item.qty}
+                  {item.productName} × {item.quantity}
                 </span>
                 <span className="text-slate-900 font-medium">
-                  {formatPrice(item.product.priceInOre * item.qty)}
+                  {formatPrice(item.unitPrice * item.quantity)}
                 </span>
               </div>
             ))}

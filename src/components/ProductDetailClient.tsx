@@ -101,12 +101,23 @@ export default function ProductDetailClient({
 
                 <button
                   onClick={() => {
-                    add(product.id);
+                    add({
+                      variantId: product.id,
+                      sku: product.id,
+                      productName: product.name,
+                      variantLabel: product.color,
+                      unitPrice: Math.round(product.price * 100),
+                      quantity: 1,
+                      imageUrl: product.image,
+                      productUrl: `/product/${product.id}`,
+                      taxRate: 2500,
+                      stock: undefined,
+                    });
                     openCart();
                   }}
                   className="mt-5 h-12 w-full rounded-full bg-black text-sm font-medium text-white active:scale-[0.99]"
                 >
-                  Add to cart
+                  Lägg i varukorg
                 </button>
 
                 <div className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10 bg-white/60">

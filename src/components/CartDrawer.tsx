@@ -1,9 +1,7 @@
-'use client';
+"use client";
 
-import type { Product } from './products';
 import { formatPrice } from './products';
-
-type CartItem = { product: Product; qty: number };
+import type { CartItem as SnapshotItem } from '@/hooks/useCart';
 
 export function CartDrawer({
   open,
@@ -14,14 +12,11 @@ export function CartDrawer({
 }: {
   open: boolean;
   onClose: () => void;
-  items: CartItem[];
-  setQty: (id: Product['id'], qty: number) => void;
+  items: SnapshotItem[];
+  setQty: (sku: string, qty: number) => void;
   onCheckout: () => void;
 }) {
-  const totalInOre = items.reduce(
-    (sum, it) => sum + it.product.priceInOre * it.qty,
-    0,
-  );
+  const totalInOre = items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0);
 
   return (
     <>
@@ -36,12 +31,15 @@ export function CartDrawer({
         ].join(' ')}
       />
 
-      {/* Drawer */}
+      {/* Drawer: mobile-first bottom sheet, desktop right-side sidebar */}
       <aside
         className={[
-          'fixed right-0 top-0 h-full w-105 bg-white shadow-2xl border-l border-slate-200',
-          'transition-transform',
-          open ? 'translate-x-0' : 'translate-x-full',
+          'fixed left-0 right-0 bottom-0 h-2/3 bg-white shadow-2xl border-t border-slate-200 rounded-t-2xl',
+          'transition-transform transform',
+          open ? 'translate-y-0' : 'translate-y-full',
+          // md+ => right sidebar
+          'md:fixed md:top-0 md:right-0 md:left-auto md:bottom-auto md:h-full md:w-105 md:rounded-none',
+          open ? 'md:translate-x-0' : 'md:translate-x-full',
         ].join(' ')}
       >
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
@@ -61,32 +59,27 @@ export function CartDrawer({
             <>
               {items.map((it) => (
                 <div
-                  key={it.product.id}
+                  key={it.sku}
                   className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4"
                 >
                   <div>
-                    <p className="font-semibold text-slate-900">
-                      {it.product.name}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {formatPrice(it.product.priceInOre)} / st
-                    </p>
+                    <p className="font-semibold text-slate-900">{it.productName}</p>
+                    <p className="text-sm text-slate-600">{formatPrice(it.unitPrice)} / st</p>
+                    {it.variantLabel && (
+                      <p className="text-xs text-slate-500">{it.variantLabel}</p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() =>
-                        setQty(it.product.id, Math.max(0, it.qty - 1))
-                      }
+                      onClick={() => setQty(it.sku, Math.max(0, it.quantity - 1))}
                       className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 font-semibold"
                     >
                       −
                     </button>
-                    <span className="w-6 text-center font-semibold">
-                      {it.qty}
-                    </span>
+                    <span className="w-6 text-center font-semibold">{it.quantity}</span>
                     <button
-                      onClick={() => setQty(it.product.id, it.qty + 1)}
+                      onClick={() => setQty(it.sku, it.quantity + 1)}
                       className="h-9 w-9 rounded-full bg-slate-100 hover:bg-slate-200 font-semibold"
                     >
                       +

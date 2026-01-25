@@ -41,9 +41,7 @@ export function ProductCard({
       <div className="mt-5 flex items-center justify-between">
         <p className="product-price">{formatPrice(product.priceInOre)}</p>
 
-        <button onClick={() => onAdd(product)} className="btn-primary">
-          Lägg i varukorg
-        </button>
+        {/* Add-to-cart removed per request; keep onAdd prop for future use */}
       </div>
     </article>
   );

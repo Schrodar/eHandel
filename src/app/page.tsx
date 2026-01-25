@@ -1,8 +1,13 @@
 // app/page.tsx
-'use client';
-
+import type { Metadata } from 'next';
 import { TopNav } from '../components/TopNav';
 import { HeroSection } from '../components/HeroSection';
+
+export const metadata: Metadata = {
+  title: 'SAZZE — Essential Tees & Wardrobe',
+  description:
+    'Utforska SAZZE — minimalistiska essentials, premium t-shirts och curated wardrobe, server-renderad för snabb laddning och bästa SEO.',
+};
 
 export default function Page() {
   return (

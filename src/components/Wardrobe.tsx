@@ -5,11 +5,13 @@ import type { WardrobeProduct } from '@/lib/wardrobeApi';
 import { SAMPLE_WARDROBE } from '@/lib/wardrobeApi';
 import './wardrobe.css';
 import Link from 'next/link';
+import { useCartContext } from '@/context/CartProvider';
 
 type Filters = {
   query: string;
   category?: string;
   fits: string[];
+  colors: string[];
   materials: string[];
   priceClasses: string[];
   seasons: string[];
@@ -24,6 +26,7 @@ export function Wardrobe({
 }: {
   products?: WardrobeProduct[];
 }) {
+  const { add, openCart } = useCartContext();
   const [filters, setFilters] = useState<Filters>({
     query: '',
     category: undefined,
@@ -212,19 +215,19 @@ export function Wardrobe({
 
       <div className="wardrobe-grid">
         {filtered.map((p) => (
-          <Link
-            key={p.id}
-            href={`/product/${p.id}`}
-            className="card no-underline"
-          >
-            <div className="imgWrap">
-              <img src={p.image} alt={p.name} />
-            </div>
-            <div className="meta">
-              <div className="name">{p.name}</div>
-              <div className="price">{p.price} kr</div>
-            </div>
-          </Link>
+          <div key={p.id} className="card">
+            <Link href={`/product/${p.id}`} className="no-underline">
+              <div className="imgWrap">
+                <img src={p.image} alt={p.name} />
+              </div>
+              <div className="meta">
+                <div className="name">{p.name}</div>
+                <div className="price">{p.price} kr</div>
+              </div>
+            </Link>
+
+            {/* Add-to-cart removed per request */}
+          </div>
         ))}
       </div>
     </section>
