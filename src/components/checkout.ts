@@ -2,7 +2,7 @@
  * CHECKOUT TYPES
  *
  * Definitioner för checkout-processen.
- * Säkerställer att data skickas korrekt till server.
+ * Säkerställer att data skickas korrekt till server och Klarna.
  */
 
 import type { CartItem } from '@/hooks/useCart';
@@ -28,6 +28,13 @@ export type CustomerInfo = {
   /** Land - låst till SE initialt */
   country: 'SE';
 };
+
+/**
+ * Produkt-ID i checkoutflödet.
+ *
+ * För riktiga produkter använder vi produktens ID/slug från databasen.
+ */
+export type ProductId = string;
 
 /**
  * Orderrad - vad klienten skickar till server

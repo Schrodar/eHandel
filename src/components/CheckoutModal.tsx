@@ -70,7 +70,7 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
     // I produktion: skicka checkoutRequest till server
     console.log('Checkout Request:', checkoutRequest);
-    console.log('Order Total:', orderTotal);
+    console.log('Order Total (öre):', orderTotal.totalInclVatOre);
 
     // Skicka vidare till parent
     onSubmit(customer);
@@ -117,9 +117,6 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
               {formatPrice(orderTotal.totalInclVatOre)}
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
-            Varav moms: {formatPrice(orderTotal.totalVatOre)}
-          </p>
         </div>
 
         {errors.length > 0 && (

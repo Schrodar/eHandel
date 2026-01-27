@@ -5,8 +5,7 @@
  * I produktion: ersätt med riktig databas.
  */
 
-import type { ProductId } from '@/components/products';
-import type { CustomerInfo } from '@/components/checkout';
+import type { ProductId, CustomerInfo } from '@/components/checkout';
 
 /**
  * Order status enligt Klarna-flödet

@@ -34,8 +34,10 @@ export default async function AdminProductDetailPage({
   const tab = toStringParam(searchParams?.tab) ?? 'overview';
 
   const [product, categories, materials, colors] = await Promise.all([
-    prisma.product.findUnique({
-      where: { id },
+    prisma.product.findFirst({
+      where: {
+        OR: [{ id }, { slug: id }],
+      },
       include: {
         category: true,
         material: true,
@@ -371,12 +373,14 @@ export default async function AdminProductDetailPage({
                 </thead>
                 <tbody>
                   {product.variants.map((v) => {
-                    const images = v.images as any as string[] | undefined;
-                    const firstImage =
-                      Array.isArray(images) && images.length > 0
-                        ? images[0]
-                        : undefined;
-                    const hasImages = !!firstImage;
+                    const imagesRaw = v.images;
+                    const images = Array.isArray(imagesRaw)
+                      ? imagesRaw.filter(
+                          (img): img is string => typeof img === 'string',
+                        )
+                      : [];
+                    const firstImage = images[0];
+                    const hasImages = images.length > 0;
                     return (
                       <tr
                         key={v.id}
@@ -579,8 +583,11 @@ export default async function AdminProductDetailPage({
               </h3>
               <div className="flex flex-wrap gap-2">
                 {product.variants.flatMap((v) => {
-                  const images = v.images as any as string[] | undefined;
-                  if (!Array.isArray(images)) return [];
+                  const imagesRaw = v.images;
+                  if (!Array.isArray(imagesRaw)) return [];
+                  const images = imagesRaw.filter(
+                    (img): img is string => typeof img === 'string',
+                  );
                   return images.map((img, index) => (
                     // eslint-disable-next-line react/no-array-index-key, @next/next/no-img-element
                     <img
