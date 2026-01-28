@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Fragment } from 'react';
 import {
   createVariant,
   publishProduct,
@@ -11,8 +12,11 @@ import {
 } from '../actions';
 
 type PageProps = {
-  params: { id: string };
-  searchParams?: { [key: string]: string | string[] | undefined };
+  // In newer Next.js runtimes, these can be Promises.
+  params: { id: string } | Promise<{ id: string }>;
+  searchParams?:
+    | { [key: string]: string | string[] | undefined }
+    | Promise<{ [key: string]: string | string[] | undefined } | undefined>;
 };
 
 function toStringParam(
@@ -30,8 +34,15 @@ export default async function AdminProductDetailPage({
   params,
   searchParams,
 }: PageProps) {
-  const id = decodeURIComponent(params.id);
-  const tab = toStringParam(searchParams?.tab) ?? 'overview';
+  // `params` may be a Promise in newer Next.js runtimes — unwrap it
+  // https://nextjs.org/docs/messages/sync-dynamic-apis
+  const resolvedParams = await Promise.resolve(params);
+  const resolvedSearchParams = await Promise.resolve(searchParams);
+
+  const id = decodeURIComponent(resolvedParams.id);
+  const tab = toStringParam(resolvedSearchParams?.tab) ?? 'overview';
+  const editVariantId = toStringParam(resolvedSearchParams?.editVariant);
+  const error = toStringParam(resolvedSearchParams?.error);
 
   const [product, categories, materials, colors] = await Promise.all([
     prisma.product.findFirst({
@@ -59,7 +70,6 @@ export default async function AdminProductDetailPage({
   }
 
   const activeVariants = product.variants.filter((v) => v.active);
-  const hasCanonical = !!product.canonicalImage;
   const klarnaReady =
     product.published &&
     activeVariants.length > 0 &&
@@ -68,8 +78,8 @@ export default async function AdminProductDetailPage({
         v.sku &&
         v.stock >= 0 &&
         v.images &&
-        v.priceInCents !== null &&
-        v.priceInCents !== undefined,
+        (v.priceInCents ?? product.priceInCents) !== null &&
+        (v.priceInCents ?? product.priceInCents) !== undefined,
     );
 
   return (
@@ -103,10 +113,10 @@ export default async function AdminProductDetailPage({
             )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center">
           <Link
             href={`/product/${product.slug}`}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50 md:w-auto"
           >
             Preview
           </Link>
@@ -115,7 +125,7 @@ export default async function AdminProductDetailPage({
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50"
+                className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-xs font-medium text-slate-800 hover:bg-slate-50 md:w-auto"
               >
                 Unpublish
               </button>
@@ -125,7 +135,7 @@ export default async function AdminProductDetailPage({
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
-                className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700"
+                className="w-full rounded-full bg-emerald-600 px-4 py-2 text-center text-xs font-medium text-white hover:bg-emerald-700 md:w-auto"
               >
                 Publish
               </button>
@@ -162,14 +172,67 @@ export default async function AdminProductDetailPage({
       </div>
 
       {tab === 'overview' && (
-        <form
-          action={updateProduct}
-          className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 text-sm"
-        >
-          <input type="hidden" name="id" value={product.id} />
+        <div className="space-y-4">
+          {error && (
+            <div
+              className={
+                error === 'publish-blocked'
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900'
+                  : 'rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900'
+              }
+            >
+              {error === 'publish-blocked' ? (
+                <div>
+                  <div className="font-semibold">Kan inte publicera ännu</div>
+                  <div className="mt-1 text-amber-800">
+                    Kräver canonicalImage + minst 1 aktiv variant som har SKU,
+                    bilder, stock ≥ 0 och pris (antingen baspris eller override).
+                  </div>
+                </div>
+              ) : error === 'price-missing' ? (
+                <div>
+                  <div className="font-semibold">Pris saknas</div>
+                  <div className="mt-1">
+                    Sätt baspris på produkten eller pris-override på varianten.
+                  </div>
+                </div>
+              ) : error === 'validation' ? (
+                <div>
+                  <div className="font-semibold">Valideringsfel</div>
+                  <div className="mt-1">
+                    Kontrollera fälten och försök igen.
+                  </div>
+                </div>
+              ) : error === 'slug' ? (
+                <div>
+                  <div className="font-semibold">Slug krockar</div>
+                  <div className="mt-1">
+                    Det finns redan en annan produkt med samma slug.
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-semibold">Något gick fel</div>
+                  <div className="mt-1">Fel: {error}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <form
+            id="product-update-form"
+            action={updateProduct}
+            className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 text-sm md:p-6"
+          >
+            <input type="hidden" name="id" value={product.id} />
+            <input
+              type="hidden"
+              name="published"
+              value={product.published ? '1' : '0'}
+            />
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-900">Grund</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   Name
@@ -209,7 +272,7 @@ export default async function AdminProductDetailPage({
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-900">Klassning</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   Category
@@ -245,7 +308,7 @@ export default async function AdminProductDetailPage({
                 </select>
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   PriceClass
@@ -273,7 +336,7 @@ export default async function AdminProductDetailPage({
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-900">Pris</h2>
-            <div className="grid max-w-sm gap-4 sm:grid-cols-2">
+            <div className="grid max-w-full gap-4 md:max-w-sm md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   Base price (SEK)
@@ -293,7 +356,7 @@ export default async function AdminProductDetailPage({
 
           <section className="space-y-3">
             <h2 className="text-sm font-semibold text-slate-900">Media</h2>
-            <div className="grid max-w-xl gap-4">
+            <div className="grid max-w-full gap-4 md:max-w-xl">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   Canonical image URL
@@ -312,17 +375,17 @@ export default async function AdminProductDetailPage({
             <h2 className="text-sm font-semibold text-slate-900">
               Status &amp; health checks
             </h2>
-            <div className="flex items-center gap-2">
-              <input
-                id="published"
-                name="published"
-                type="checkbox"
-                defaultChecked={product.published}
-                className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-              />
-              <label htmlFor="published" className="text-sm text-slate-700">
-                Published
-              </label>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <div className="text-slate-700">Status:</div>
+              <span
+                className={
+                  product.published
+                    ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700'
+                    : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600'
+                }
+              >
+                {product.published ? 'Published' : 'Draft'}
+              </span>
             </div>
             <ul className="space-y-1 text-xs">
               {product.published && !product.canonicalImage && (
@@ -338,15 +401,40 @@ export default async function AdminProductDetailPage({
             </ul>
           </section>
 
+          </form>
+
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            {product.published ? (
+              <form action={unpublishProduct}>
+                <input type="hidden" name="id" value={product.id} />
+                <button
+                  type="submit"
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                >
+                  Unpublish
+                </button>
+              </form>
+            ) : (
+              <form action={publishProduct}>
+                <input type="hidden" name="id" value={product.id} />
+                <button
+                  type="submit"
+                  className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  Publish
+                </button>
+              </form>
+            )}
+
             <button
               type="submit"
+              form="product-update-form"
               className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               Spara ändringar
             </button>
           </div>
-        </form>
+        </div>
       )}
 
       {tab === 'variants' && (
@@ -358,7 +446,257 @@ export default async function AdminProductDetailPage({
           {product.variants.length === 0 ? (
             <p className="text-xs text-slate-600">Inga varianter ännu.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <>
+              <div className="space-y-3 md:hidden">
+                {product.variants.map((v) => {
+                  const imagesRaw = v.images;
+                  const images = Array.isArray(imagesRaw)
+                    ? imagesRaw.filter(
+                        (img): img is string => typeof img === 'string',
+                      )
+                    : [];
+                  const firstImage = images[0];
+                  const hasImages = images.length > 0;
+                  const isEditing = editVariantId === v.id;
+                  const editHref = `/admin/products/${product.id}?tab=variants&editVariant=${encodeURIComponent(
+                    v.id,
+                  )}`;
+                  const cancelHref = `/admin/products/${product.id}?tab=variants`;
+                  const imagesJsonDefault = hasImages ? JSON.stringify(images) : '';
+                  const priceOverrideSekDefault =
+                    v.priceInCents != null ? (v.priceInCents / 100).toFixed(2) : '';
+                  const priceDisplaySek =
+                    (v.priceInCents ?? product.priceInCents) != null
+                      ? ((v.priceInCents ?? product.priceInCents) / 100).toFixed(2)
+                      : '—';
+
+                  return (
+                    <details
+                      key={v.id}
+                      className="group rounded-xl border border-slate-200 bg-white"
+                      open={isEditing}
+                    >
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden [&::marker]:content-none">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 shrink-0">
+                              {hasImages ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={firstImage}
+                                  alt={v.sku}
+                                  className="h-10 w-10 rounded-md object-cover ring-1 ring-slate-200"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-200 text-[10px] text-slate-400">
+                                  No img
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="truncate font-mono text-[11px] text-slate-800">
+                                  {v.sku}
+                                </div>
+                                <span
+                                  className={
+                                    v.active
+                                      ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                                      : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'
+                                  }
+                                >
+                                  {v.active ? 'Active' : 'Inactive'}
+                                </span>
+                              </div>
+                              <div className="mt-0.5 truncate text-xs text-slate-600">
+                                {v.color?.name ?? '–'} · Stock {v.stock} · {priceDisplaySek} kr
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <svg
+                          viewBox="0 0 20 20"
+                          aria-hidden="true"
+                          className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08Z"
+                          />
+                        </svg>
+                      </summary>
+
+                      <div className="border-t border-slate-200 px-4 py-3 text-xs">
+                        <div className="grid gap-3 text-slate-700">
+                          <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                              Variant ID
+                            </div>
+                            <div className="mt-0.5 break-words font-mono text-[11px] text-slate-700">
+                              {v.id}
+                            </div>
+                          </div>
+                          {!hasImages && (
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-800">
+                              Saknar bilder (krävs för aktiv variant).
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 gap-2">
+                          <form action={toggleVariantActive}>
+                            <input type="hidden" name="id" value={v.id} />
+                            <input
+                              type="hidden"
+                              name="productId"
+                              value={product.id}
+                            />
+                            <button
+                              type="submit"
+                              className={
+                                v.active
+                                  ? 'w-full rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100'
+                                  : 'w-full rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200'
+                              }
+                            >
+                              {v.active ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </form>
+
+                          {isEditing ? (
+                            <Link
+                              href={cancelHref}
+                              className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              Cancel
+                            </Link>
+                          ) : (
+                            <Link
+                              href={editHref}
+                              className="w-full rounded-full bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+                            >
+                              Edit
+                            </Link>
+                          )}
+                        </div>
+
+                        {isEditing && (
+                          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <form action={updateVariant} className="grid gap-3 md:grid-cols-3">
+                              <input type="hidden" name="id" value={v.id} />
+                              <input
+                                type="hidden"
+                                name="productId"
+                                value={product.id}
+                              />
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  SKU
+                                </label>
+                                <input
+                                  type="text"
+                                  name="sku"
+                                  required
+                                  defaultValue={v.sku}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Color
+                                </label>
+                                <select
+                                  name="colorId"
+                                  defaultValue={v.colorId ?? ''}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                >
+                                  <option value="">Ingen</option>
+                                  {colors.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Stock
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  name="stock"
+                                  defaultValue={v.stock}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Price override (SEK)
+                                </label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  name="priceOverrideSek"
+                                  defaultValue={priceOverrideSekDefault}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Images JSON
+                                </label>
+                                <textarea
+                                  name="imagesJson"
+                                  rows={2}
+                                  placeholder='["/images/variant1.jpg"]'
+                                  defaultValue={imagesJsonDefault}
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div className="flex items-end gap-2">
+                                <label className="flex items-center gap-1 text-[11px] text-slate-700">
+                                  <input
+                                    type="checkbox"
+                                    name="active"
+                                    defaultChecked={v.active}
+                                    className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                  />
+                                  Active
+                                </label>
+                              </div>
+
+                              <div className="flex items-end justify-end gap-2 md:col-span-3">
+                                <Link
+                                  href={cancelHref}
+                                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                  Avbryt
+                                </Link>
+                                <button
+                                  type="submit"
+                                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                                >
+                                  Spara variant
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-lg border border-slate-200 md:block">
               <table className="min-w-full text-left text-xs">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   <tr>
@@ -369,6 +707,7 @@ export default async function AdminProductDetailPage({
                     <th className="px-3 py-2 text-right">Price override</th>
                     <th className="px-3 py-2 text-center">Badges</th>
                     <th className="px-3 py-2 text-center">Active</th>
+                    <th className="px-3 py-2 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -381,79 +720,226 @@ export default async function AdminProductDetailPage({
                       : [];
                     const firstImage = images[0];
                     const hasImages = images.length > 0;
+                    const isEditing = editVariantId === v.id;
+                    const editHref = `/admin/products/${product.id}?tab=variants&editVariant=${encodeURIComponent(
+                      v.id,
+                    )}`;
+                    const cancelHref = `/admin/products/${product.id}?tab=variants`;
+                    const imagesJsonDefault = hasImages
+                      ? JSON.stringify(images)
+                      : '';
+                    const priceOverrideSekDefault =
+                      v.priceInCents != null ? (v.priceInCents / 100).toFixed(2) : '';
+
                     return (
-                      <tr
-                        key={v.id}
-                        className="border-b border-slate-100 last:border-0"
-                      >
-                        <td className="px-3 py-2">
-                          {hasImages ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={firstImage}
-                              alt={v.sku}
-                              className="h-8 w-8 rounded-md object-cover ring-1 ring-slate-200"
-                            />
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-slate-200 text-[9px] text-slate-400">
-                              No img
+                      <Fragment key={v.id}>
+                        <tr className="border-b border-slate-100 last:border-0">
+                          <td className="px-3 py-2">
+                            {hasImages ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={firstImage}
+                                alt={v.sku}
+                                className="h-8 w-8 rounded-md object-cover ring-1 ring-slate-200"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-slate-200 text-[9px] text-slate-400">
+                                No img
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-[11px] text-slate-800">
+                            {v.sku}
+                          </td>
+                          <td className="px-3 py-2 text-[11px] text-slate-700">
+                            {v.color?.name ?? '–'}
+                          </td>
+                          <td className="px-3 py-2 text-right text-[11px] tabular-nums">
+                            {v.stock}
+                          </td>
+                          <td className="px-3 py-2 text-right text-[11px] tabular-nums">
+                            {v.priceInCents != null
+                              ? (v.priceInCents / 100).toFixed(2)
+                              : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-center text-[10px]">
+                            <div className="flex flex-wrap items-center justify-center gap-1">
+                              {!hasImages && (
+                                <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                  No images
+                                </span>
+                              )}
+                              {v.stock === 0 && (
+                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                                  Stock 0
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-[11px] text-slate-800">
-                          {v.sku}
-                        </td>
-                        <td className="px-3 py-2 text-[11px] text-slate-700">
-                          {v.color?.name ?? '–'}
-                        </td>
-                        <td className="px-3 py-2 text-right text-[11px] tabular-nums">
-                          {v.stock}
-                        </td>
-                        <td className="px-3 py-2 text-right text-[11px] tabular-nums">
-                          {v.priceInCents != null
-                            ? (v.priceInCents / 100).toFixed(2)
-                            : '—'}
-                        </td>
-                        <td className="px-3 py-2 text-center text-[10px]">
-                          <div className="flex flex-wrap items-center justify-center gap-1">
-                            {!hasImages && (
-                              <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                                No images
-                              </span>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <form action={toggleVariantActive}>
+                              <input type="hidden" name="id" value={v.id} />
+                              <input
+                                type="hidden"
+                                name="productId"
+                                value={product.id}
+                              />
+                              <button
+                                type="submit"
+                                className={
+                                  v.active
+                                    ? 'rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100'
+                                    : 'rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-200'
+                                }
+                              >
+                                {v.active ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </form>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {isEditing ? (
+                              <Link
+                                href={cancelHref}
+                                className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-200"
+                              >
+                                Cancel
+                              </Link>
+                            ) : (
+                              <Link
+                                href={editHref}
+                                className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-medium text-white hover:bg-slate-800"
+                              >
+                                Edit
+                              </Link>
                             )}
-                            {v.stock === 0 && (
-                              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
-                                Stock 0
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <form action={toggleVariantActive}>
-                            <input type="hidden" name="id" value={v.id} />
-                            <input
-                              type="hidden"
-                              name="productId"
-                              value={product.id}
-                            />
-                            <button
-                              type="submit"
-                              className={
-                                v.active
-                                  ? 'rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100'
-                                  : 'rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-200'
-                              }
-                            >
-                              {v.active ? 'Deactivate' : 'Activate'}
-                            </button>
-                          </form>
-                        </td>
-                      </tr>
+                          </td>
+                        </tr>
+
+                        {isEditing && (
+                          <tr className="border-b border-slate-100 last:border-0">
+                            <td colSpan={8} className="px-3 py-3 bg-slate-50">
+                              <form
+                                action={updateVariant}
+                                className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3"
+                              >
+                                <input type="hidden" name="id" value={v.id} />
+                                <input
+                                  type="hidden"
+                                  name="productId"
+                                  value={product.id}
+                                />
+
+                                <div>
+                                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                    SKU
+                                  </label>
+                                  <input
+                                    type="text"
+                                    name="sku"
+                                    required
+                                    defaultValue={v.sku}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                    Color
+                                  </label>
+                                  <select
+                                    name="colorId"
+                                    defaultValue={v.colorId ?? ''}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  >
+                                    <option value="">Ingen</option>
+                                    {colors.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {c.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                    Stock
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    name="stock"
+                                    defaultValue={v.stock}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                    Price override (SEK)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="priceOverrideSek"
+                                    defaultValue={priceOverrideSekDefault}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                    Images JSON
+                                  </label>
+                                  <textarea
+                                    name="imagesJson"
+                                    rows={2}
+                                    placeholder='["/images/variant1.jpg"]'
+                                    defaultValue={imagesJsonDefault}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  />
+                                  <p className="mt-1 text-[10px] text-slate-500">
+                                    Krävs om varianten ska vara aktiv.
+                                  </p>
+                                </div>
+
+                                <div className="flex items-end gap-2">
+                                  <label className="flex items-center gap-1 text-[11px] text-slate-700">
+                                    <input
+                                      type="checkbox"
+                                      name="active"
+                                      defaultChecked={v.active}
+                                      className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                    />
+                                    Active
+                                  </label>
+                                </div>
+
+                                <div className="flex items-end justify-end gap-2 sm:col-span-3">
+                                  <Link
+                                    href={cancelHref}
+                                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                  >
+                                    Avbryt
+                                  </Link>
+                                  <button
+                                    type="submit"
+                                    className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                                  >
+                                    Spara variant
+                                  </button>
+                                </div>
+                              </form>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           <div className="mt-6 border-t border-slate-200 pt-4">
@@ -462,7 +948,7 @@ export default async function AdminProductDetailPage({
             </h3>
             <form
               action={createVariant}
-              className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3"
+              className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-3"
             >
               <input type="hidden" name="productId" value={product.id} />
               <div>
@@ -516,7 +1002,7 @@ export default async function AdminProductDetailPage({
                   className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div className="md:col-span-2">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                   Images JSON
                 </label>
@@ -541,7 +1027,7 @@ export default async function AdminProductDetailPage({
                   Active
                 </label>
               </div>
-              <div className="flex items-end justify-end sm:col-span-3">
+              <div className="flex items-end justify-end md:col-span-3">
                 <button
                   type="submit"
                   className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
@@ -589,7 +1075,7 @@ export default async function AdminProductDetailPage({
                     (img): img is string => typeof img === 'string',
                   );
                   return images.map((img, index) => (
-                    // eslint-disable-next-line react/no-array-index-key, @next/next/no-img-element
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={`${v.id}-${index}`}
                       src={img}

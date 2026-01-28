@@ -5,7 +5,6 @@ import type { WardrobeProduct } from '@/lib/wardrobeApi';
 import { SAMPLE_WARDROBE } from '@/lib/wardrobeApi';
 import './wardrobe.css';
 import Link from 'next/link';
-import { useCartContext } from '@/context/CartProvider';
 
 type Filters = {
   query: string;
@@ -26,7 +25,6 @@ export function Wardrobe({
 }: {
   products?: WardrobeProduct[];
 }) {
-  const { add, openCart } = useCartContext();
   const [filters, setFilters] = useState<Filters>({
     query: '',
     category: undefined,
@@ -218,6 +216,7 @@ export function Wardrobe({
           <div key={p.id} className="card">
             <Link href={`/product/${p.id}`} className="no-underline">
               <div className="imgWrap">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.image} alt={p.name} />
               </div>
               <div className="meta">

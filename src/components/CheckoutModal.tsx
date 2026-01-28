@@ -6,6 +6,7 @@ import type { CustomerInfo } from './checkout';
 import { validateCheckoutRequest, createCheckoutRequest } from './checkout';
 import { useCartContext } from '@/context/CartProvider';
 import { formatPrice } from './products';
+import type { CartItem } from '@/hooks/useCart';
 
 type Props = {
   open: boolean;
@@ -23,8 +24,23 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
   if (!open) return null;
 
   // Beräkna totalsumma lokalt från cart items (öre)
+  type LineItemSummary = {
+    product: CartItem;
+    quantity: number;
+    lineTotal: number;
+    lineVat: number;
+  };
+
   const orderTotal = items.reduce(
-    (acc, it) => {
+    (
+      acc: {
+        totalInclVatOre: number;
+        totalExVatOre: number;
+        totalVatOre: number;
+        lineItems: LineItemSummary[];
+      },
+      it,
+    ) => {
       const unit = it.unitPrice;
       const qty = it.quantity;
       const lineTotal = unit * qty;
@@ -34,10 +50,10 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
       acc.totalInclVatOre += lineTotal;
       acc.totalExVatOre += lineExVat;
       acc.totalVatOre += lineVat;
-      acc.lineItems.push({ product: it as any, quantity: qty, lineTotal, lineVat });
+      acc.lineItems.push({ product: it, quantity: qty, lineTotal, lineVat });
       return acc;
     },
-    { totalInclVatOre: 0, totalExVatOre: 0, totalVatOre: 0, lineItems: [] as any[] },
+    { totalInclVatOre: 0, totalExVatOre: 0, totalVatOre: 0, lineItems: [] },
   );
 
   function handleSubmit(e: React.FormEvent) {
@@ -56,7 +72,7 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
     };
 
     // Skapa checkout request
-    const checkoutRequest = createCheckoutRequest(cart as any, customer);
+    const checkoutRequest = createCheckoutRequest(cart, customer);
 
     // Validera
     const validation = validateCheckoutRequest(checkoutRequest);

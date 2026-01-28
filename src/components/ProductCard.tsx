@@ -11,6 +11,7 @@ export function ProductCard({
   product: Product;
   onAdd: (p: Product) => void;
 }) {
+  void onAdd;
   return (
     <article className="product-card">
       <div className="flex items-start justify-between gap-6">

@@ -28,32 +28,39 @@ export type CartState = Record<string, CartItem>; // key: SKU
 const STORAGE_KEY = "cart:v1";
 
 export function useCart() {
-  // Stabil initial render: tom vagn både på server och första client-render
+  // Viktigt för att undvika hydration mismatch:
+  // första render ska matcha servern => börja alltid med tom vagn.
   const [cart, setCart] = useState<CartState>({});
+  const [hydrated, setHydrated] = useState(false);
 
-  // Läs in sparad vagn först efter att komponenten har mountat i browsern
+  // Läs in sparad vagn efter mount (endast i browsern)
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as CartState;
-        setCart(parsed);
+        if (parsed && typeof parsed === "object") {
+          setCart(parsed);
+        }
       }
     } catch {
       // ignorera parse/localStorage-fel
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
   // Skriv tillbaka till localStorage när cart ändras (endast i browsern)
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (!hydrated) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
     } catch {
       // ignorera
     }
-  }, [cart]);
+  }, [cart, hydrated]);
 
   const items = useMemo(
     () => Object.values(cart).filter((i) => i.quantity > 0),

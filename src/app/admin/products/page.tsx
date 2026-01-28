@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import Link from 'next/link';
+import { deleteProduct } from './actions';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -12,6 +14,143 @@ function toStringParam(
 ): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value ?? undefined;
+}
+
+type ProductRow = Prisma.ProductGetPayload<{
+  include: {
+    category: true;
+    material: true;
+    variants: true;
+    _count: { select: { variants: true } };
+  };
+}>;
+
+function MobileProductListAccordion({
+  products,
+}: {
+  products: ProductRow[];
+}) {
+  return (
+    <div className="space-y-3 md:hidden">
+      {products.map((p) => {
+        const activeVariants = p.variants.filter((v) => v.active);
+        const hasProblem =
+          (p.published && !p.canonicalImage) ||
+          (p.published && activeVariants.length === 0) ||
+          activeVariants.some((v) => !v.images);
+
+        return (
+          <details
+            key={p.id}
+            className="group rounded-xl border border-slate-200 bg-white"
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden [&::marker]:content-none">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="truncate text-sm font-medium text-slate-900">
+                    {p.name}
+                  </div>
+                  <span
+                    className={
+                      p.published
+                        ? 'shrink-0 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                        : 'shrink-0 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'
+                    }
+                  >
+                    {p.published ? 'Published' : 'Draft'}
+                  </span>
+                  {hasProblem && (
+                    <span className="shrink-0 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      Problem
+                    </span>
+                  )}
+                </div>
+              </div>
+              <svg
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-open:rotate-180"
+              >
+                <path
+                  fill="currentColor"
+                  d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 10.94l3.71-3.71a.75.75 0 1 1 1.06 1.06l-4.24 4.24a.75.75 0 0 1-1.06 0L5.21 8.29a.75.75 0 0 1 .02-1.08Z"
+                />
+              </svg>
+            </summary>
+
+            <div className="border-t border-slate-200 px-4 py-3 text-xs text-slate-700">
+              <dl className="grid grid-cols-1 gap-3">
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Slug
+                  </dt>
+                  <dd className="mt-0.5 break-words font-mono text-[11px] text-slate-700">
+                    {p.slug}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    ID
+                  </dt>
+                  <dd className="mt-0.5 break-words font-mono text-[11px] text-slate-700">
+                    {p.id}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Pris
+                    </dt>
+                    <dd className="mt-0.5 text-sm font-medium tabular-nums text-slate-900">
+                      {Math.round(p.priceInCents / 100)} kr
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                      Varianter
+                    </dt>
+                    <dd className="mt-0.5 text-sm font-medium tabular-nums text-slate-900">
+                      {activeVariants.length}/{p._count.variants}
+                    </dd>
+                  </div>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Uppdaterad
+                  </dt>
+                  <dd className="mt-0.5 text-slate-600">—</dd>
+                </div>
+              </dl>
+
+              <div className="mt-4 grid grid-cols-1 gap-2">
+                <Link
+                  href={`/admin/products/${p.id}`}
+                  className="w-full rounded-full bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Edit
+                </Link>
+                <Link
+                  href={`/product/${p.slug}`}
+                  className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Preview
+                </Link>
+                <form action={deleteProduct}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button
+                    type="submit"
+                    className="w-full rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100"
+                  >
+                    Delete
+                  </button>
+                </form>
+              </div>
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
 }
 
 export default async function AdminProductsPage({
@@ -27,7 +166,7 @@ export default async function AdminProductsPage({
   const season = toStringParam(searchParams?.season) ?? '';
   const sort = toStringParam(searchParams?.sort) ?? 'name-asc';
 
-  const where: any = {};
+  const where: Prisma.ProductWhereInput = {};
 
   if (q) {
     where.OR = [
@@ -56,7 +195,7 @@ export default async function AdminProductsPage({
     where.season = season;
   }
 
-  let orderBy: any = { name: 'asc' };
+  let orderBy: Prisma.ProductOrderByWithRelationInput = { name: 'asc' };
   if (sort === 'name-desc') {
     orderBy = { name: 'desc' };
   } else if (sort === 'price-asc') {
@@ -106,8 +245,8 @@ export default async function AdminProductsPage({
         </div>
       </header>
 
-      <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm sm:grid-cols-4">
-        <div className="sm:col-span-2">
+  <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-4">
+        <div className="md:col-span-2">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
             Sök
           </label>
@@ -206,7 +345,7 @@ export default async function AdminProductsPage({
             className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
           />
         </div>
-        <div className="flex items-end justify-end gap-2 sm:col-span-2">
+        <div className="flex items-end justify-end gap-2 md:col-span-2">
           <button
             type="submit"
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
@@ -221,7 +360,9 @@ export default async function AdminProductsPage({
           Inga produkter matchar filtren.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white text-sm">
+        <>
+          <MobileProductListAccordion products={products} />
+          <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white text-sm md:block">
           <table className="min-w-full text-left">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
               <tr>
@@ -328,7 +469,8 @@ export default async function AdminProductsPage({
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,5 +1,18 @@
 # Klarna Integration - URLs & Flöde
 
+“Klarna-ready” betyder att produkten uppfyller de minimikrav som din kod använder för att den ska kunna skickas till checkout utan att Klarna-flödet spricker p.g.a. saknade data.
+
+I admin-detailen räknas den som Klarna-ready när:
+
+Produkten är Published
+Det finns minst 1 aktiv variant
+Varje aktiv variant har:
+sku
+stock >= 0
+images
+ett pris (antingen variantens priceInCents eller produktens baspris priceInCents)
+Logiken sitter i src/app/admin/products/[id]/page.tsx där klarnaReady beräknas.
+
 ## 🔗 Klarna Merchant URLs
 
 Dessa URLs måste konfigureras i Klarna och i din applikation:
@@ -141,14 +154,15 @@ const KLARNA_URLS_DEV = {
    │  1. Hämta Klarna session                │
    │  2. Validera status = authorized        │
    │  3. Extrahera kunduppgifter från Klarna │
-   │  4. Skapa order i "minnet"              │
-   │     (i prod: spara till DB)             │
+// 3. Skapa order i DB (nu persisteras orders i Prisma) │
    │     - order_id                          │
    │     - customer_info                     │
    │     - items                             │
    │     - total_amount                      │
    │     - klarna_order_id                   │
    │     - status: 'authorized'              │
+
+**Note:** Run `npm run migrate:dev` locally after pulling schema changes to create the orders tables.
    │  5. Logga till console/fil              │
    │  6. Returnera order_id                  │
    └────┬────────────────────────────────────┘

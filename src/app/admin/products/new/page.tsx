@@ -32,11 +32,11 @@ export default async function NewProductPage() {
 
       <form
         action={createProduct}
-        className="space-y-8 rounded-xl border border-slate-200 bg-white p-6 text-sm"
+        className="space-y-8 rounded-xl border border-slate-200 bg-white p-4 text-sm md:p-6"
       >
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-900">Grund</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Name
@@ -74,7 +74,7 @@ export default async function NewProductPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-900">Klassning</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Category
@@ -110,7 +110,7 @@ export default async function NewProductPage() {
               </select>
             </div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 PriceClass
@@ -138,7 +138,7 @@ export default async function NewProductPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-900">Pris</h2>
-          <div className="grid max-w-sm gap-4 sm:grid-cols-2">
+          <div className="grid max-w-full gap-4 md:max-w-sm md:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Base price (SEK)
@@ -157,7 +157,7 @@ export default async function NewProductPage() {
 
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-slate-900">Media</h2>
-          <div className="grid max-w-xl gap-4">
+          <div className="grid max-w-full gap-4 md:max-w-xl">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Canonical image URL
@@ -190,19 +190,19 @@ export default async function NewProductPage() {
           </div>
         </section>
 
-        <div className="flex justify-between gap-3 border-t border-slate-200 pt-4">
+        <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
           <Link
             href="/admin/products"
             className="text-sm font-medium text-slate-600 underline-offset-2 hover:underline"
           >
             Avbryt
           </Link>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <button
               type="submit"
               name="next"
               value="overview"
-              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+              className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 sm:w-auto"
             >
               Spara
             </button>
@@ -210,7 +210,7 @@ export default async function NewProductPage() {
               type="submit"
               name="next"
               value="variants"
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              className="w-full rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
             >
               Spara &amp; lägg till varianter
             </button>

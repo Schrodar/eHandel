@@ -215,6 +215,7 @@ export async function publishProduct(formData: FormData) {
 
   const activeVariants = product.variants.filter((v) => v.active);
   const hasCanonical = !!product.canonicalImage;
+  const basePriceInCents = product.priceInCents;
   const hasReadyVariants =
     activeVariants.length > 0 &&
     activeVariants.every(
@@ -222,8 +223,8 @@ export async function publishProduct(formData: FormData) {
         v.sku &&
         v.stock >= 0 &&
         v.images &&
-        v.priceInCents !== null &&
-        v.priceInCents !== undefined,
+        (v.priceInCents ?? basePriceInCents) !== null &&
+        (v.priceInCents ?? basePriceInCents) !== undefined,
     );
 
   if (!hasCanonical || !hasReadyVariants) {
@@ -256,6 +257,18 @@ export async function unpublishProduct(formData: FormData) {
   revalidatePath(`/admin/products/${id}`);
 
   redirect(`/admin/products/${id}`);
+}
+
+export async function deleteProduct(formData: FormData) {
+  const id = ((formData.get('id') as string | null) || '').trim();
+  if (!id) redirect('/admin/products?error=missing-id');
+
+  await prisma.product.delete({ where: { id } });
+
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+
+  redirect('/admin/products');
 }
 
 export async function createVariant(formData: FormData) {
@@ -433,6 +446,9 @@ export async function toggleVariantActive(formData: FormData) {
   const variant = await prisma.productVariant.findUnique({ where: { id } });
   if (!variant) redirect('/admin/products?error=missing-variant');
 
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) redirect('/admin/products?error=missing-product');
+
   const nextActive = !variant.active;
 
   if (nextActive) {
@@ -448,6 +464,9 @@ export async function toggleVariantActive(formData: FormData) {
       redirect(
         `/admin/products/${productId}?tab=variants&error=images-missing`,
       );
+    }
+    if ((variant.priceInCents ?? product.priceInCents) == null) {
+      redirect(`/admin/products/${productId}?tab=variants&error=price-missing`);
     }
   }
 

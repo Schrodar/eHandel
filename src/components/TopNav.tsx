@@ -4,11 +4,9 @@
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
-type Props = unknown;
-
 import { useCartContext } from '@/context/CartProvider';
 
-export function TopNav(_props: Props) {
+export function TopNav() {
   const { totalQty, openCart } = useCartContext();
 
   return (

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 export const metadata = {
   title: 'Admin – Färger',
@@ -24,12 +25,65 @@ async function upsertColor(formData: FormData) {
   revalidatePath('/admin/colors');
 }
 
-export default async function AdminColorsPage() {
+async function deleteColor(formData: FormData) {
+  'use server';
+
+  const id = ((formData.get('id') as string | null) || '').trim();
+  if (!id) redirect('/admin/colors?error=missing-id');
+
+  const inUseCount = await prisma.productVariant.count({ where: { colorId: id } });
+  if (inUseCount > 0) {
+    redirect(`/admin/colors?error=in-use&id=${encodeURIComponent(id)}&count=${inUseCount}`);
+  }
+
+  await prisma.color.delete({ where: { id } });
+  revalidatePath('/admin/colors');
+  redirect('/admin/colors?deleted=1');
+}
+
+type SearchParams = { [key: string]: string | string[] | undefined };
+
+function toStringParam(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) return value[0];
+  return value ?? undefined;
+}
+
+export default async function AdminColorsPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
   const colors = await prisma.color.findMany({ orderBy: { name: 'asc' } });
+
+  const error = toStringParam(searchParams?.error);
+  const deleted = toStringParam(searchParams?.deleted);
+  const errorId = toStringParam(searchParams?.id);
+  const errorCount = toStringParam(searchParams?.count);
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-serif">Färger</h1>
+
+      {(deleted === '1' || error) && (
+        <div
+          className={
+            deleted === '1'
+              ? 'rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900'
+              : 'rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900'
+          }
+        >
+          {deleted === '1' ? (
+            <div>Färgen togs bort.</div>
+          ) : error === 'in-use' ? (
+            <div>
+              Kan inte ta bort färg{errorId ? ` "${errorId}"` : ''} eftersom den används av {errorCount ?? 'en eller flera'} varianter.
+            </div>
+          ) : (
+            <div>Något gick fel vid borttag.</div>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-[2fr,1fr]">
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
           <table className="min-w-full text-left text-sm">
@@ -65,31 +119,43 @@ export default async function AdminColorsPage() {
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right text-xs">
-                    <form
-                      action={upsertColor}
-                      className="inline-flex items-center gap-2"
-                    >
-                      <input type="hidden" name="id" value={c.id} />
-                      <input
-                        type="text"
-                        name="name"
-                        defaultValue={c.name}
-                        className="w-24 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                      />
-                      <input
-                        type="text"
-                        name="hex"
-                        defaultValue={c.hex ?? ''}
-                        placeholder="#ffffff"
-                        className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                      />
-                      <button
-                        type="submit"
-                        className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-800"
+                    <div className="inline-flex items-center gap-2">
+                      <form
+                        action={upsertColor}
+                        className="inline-flex items-center gap-2"
                       >
-                        Spara
-                      </button>
-                    </form>
+                        <input type="hidden" name="id" value={c.id} />
+                        <input
+                          type="text"
+                          name="name"
+                          defaultValue={c.name}
+                          className="w-24 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                        />
+                        <input
+                          type="text"
+                          name="hex"
+                          defaultValue={c.hex ?? ''}
+                          placeholder="#ffffff"
+                          className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-slate-800"
+                        >
+                          Spara
+                        </button>
+                      </form>
+
+                      <form action={deleteColor}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <button
+                          type="submit"
+                          className="rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50"
+                        >
+                          Ta bort
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}

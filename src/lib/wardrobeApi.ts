@@ -98,7 +98,7 @@ export function getProductById(id: string): WardrobeProduct | undefined {
       SAMPLE_WARDROBE.find((p) => compact(p.id) === compact(needle)) ||
       SAMPLE_WARDROBE.find((p) => compact(p.name) === compact(needle))
     );
-  } catch (e) {
+  } catch {
     return undefined;
   }
 }

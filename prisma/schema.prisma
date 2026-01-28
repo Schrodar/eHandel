@@ -75,3 +75,43 @@ model ProductVariant {
     @@index([productId])
     @@index([colorId])
 }
+
+// Orders stored when customers checkout through Klarna
+model Order {
+    id               String       @id @default(cuid())
+    orderNumber      String       @unique // human-readable ORDER-YYYY-0001
+    klarnaOrderId    String?      @unique
+    sessionId        String?      @unique
+    status           String       @default("created")
+    customerEmail    String
+    customerFirst    String?
+    customerLast     String?
+    customerPhone    String?
+    streetAddress    String?
+    postalCode       String?
+    city             String?
+    country          String?
+    totalInclVat     Int
+    totalVat         Int
+    metadata         Json?
+    createdAt        DateTime     @default(now())
+    updatedAt        DateTime     @updatedAt
+
+    items OrderItem[]
+
+    @@index([sessionId])
+    @@index([klarnaOrderId])
+}
+
+model OrderItem {
+    id                 Int    @id @default(autoincrement())
+    orderId            String
+    order              Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    productId          String
+    variantId          String?
+    sku                String?
+    quantity           Int
+    priceAtPurchaseOre Int
+    vatBasisPoints     Int
+}
+

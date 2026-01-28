@@ -11,20 +11,50 @@ function calcTaxAmount(totalAmount: number, taxRateBp: number) {
   return Math.round(numerator / divisor);
 }
 
+type CheckoutItemInput = {
+  variantId?: string;
+  sku?: string;
+  quantity?: number;
+  clientUnitPrice?: number; // öre
+};
+
+type CheckoutPayload = {
+  currency?: string;
+  locale?: string;
+  items?: CheckoutItemInput[];
+};
+
+type KlarnaLineItem = {
+  name: string;
+  reference: string | null;
+  quantity: number;
+  unit_price: number;
+  total_amount: number;
+  tax_rate: number;
+  total_tax_amount: number;
+  image_url?: string;
+  product_url: string;
+  merchant_data: string;
+};
+
+type WarningItem = {
+  code: 'PRICE_CHANGED';
+  sku: string | null;
+  oldUnitPrice: number;
+  newUnitPrice: number;
+};
+
+function firstImageFromJson(images: unknown): string | undefined {
+  if (!Array.isArray(images)) return undefined;
+  const first = images.find((v) => typeof v === 'string');
+  return typeof first === 'string' ? first : undefined;
+}
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body: CheckoutPayload = (await req.json()) as CheckoutPayload;
 
-    const { currency, locale, items } = body as {
-      currency?: string;
-      locale?: string;
-      items?: Array<{
-        variantId?: string;
-        sku?: string;
-        quantity?: number;
-        clientUnitPrice?: number; // öre
-      }>;
-    };
+    const { currency, locale, items } = body;
 
     // Basic validation
     if (!currency || !locale || !Array.isArray(items)) {
@@ -85,17 +115,17 @@ export async function POST(req: Request) {
     const bySku = new Map<string, typeof variants[number]>();
     for (const v of variants) {
       if (v.id) byId.set(v.id, v);
-      if ((v as any).sku) bySku.set((v as any).sku, v);
+      if (v.sku) bySku.set(v.sku, v);
     }
 
     const siteUrl =
       process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
-    const line_items: any[] = [];
-    const warnings: any[] = [];
+    const line_items: KlarnaLineItem[] = [];
+    const warnings: WarningItem[] = [];
 
     for (const [index, it] of items.entries()) {
-      const qty = Math.floor(it.quantity as number);
+      const qty = Math.floor(Number(it.quantity));
 
       let variant = undefined;
       if (it.variantId) variant = byId.get(it.variantId);
@@ -109,28 +139,27 @@ export async function POST(req: Request) {
       }
 
       // Defensive property checks
-      const active = (variant as any).active;
-      if (active === false) {
+      if (variant.active === false) {
         return NextResponse.json({ error: 'Variant inactive', variantId: variant.id }, { status: 400 });
       }
 
-      const product = variant.product as any;
+      const product = variant.product;
       if (!product?.published) {
         // policy: reject unpublished products
         return NextResponse.json({ error: 'Product not published', productId: product?.id }, { status: 400 });
       }
 
-      const stock = (variant as any).stock ?? null;
+      const stock = variant.stock ?? null;
       if (stock !== null && stock < qty) {
         return NextResponse.json(
-          { error: 'OUT_OF_STOCK', variantId: variant.id, sku: (variant as any).sku, available: stock, requested: qty },
+          { error: 'OUT_OF_STOCK', variantId: variant.id, sku: variant.sku, available: stock, requested: qty },
           { status: 409 },
         );
       }
 
       // Determine unit price in cents (öre -> cents means cents already vs öre; repo uses priceInCents)
       // Repo uses priceInCents (cents) — treat as öre-equivalent integer as requested.
-      const unitPrice = (variant as any).priceInCents ?? product.priceInCents;
+      const unitPrice = variant.priceInCents ?? product.priceInCents;
       if (!Number.isInteger(unitPrice)) {
         return NextResponse.json({ error: 'Invalid price in DB for variant', variantId: variant.id }, { status: 500 });
       }
@@ -139,7 +168,7 @@ export async function POST(req: Request) {
       const total_tax_amount = calcTaxAmount(total_amount, DEFAULT_TAX_RATE_BP);
 
       // build image_url absolute
-      const rawImage = (variant as any).image ?? product.canonicalImage;
+      const rawImage = firstImageFromJson(variant.images as unknown) ?? product.canonicalImage;
       const image_url = rawImage
         ? rawImage.startsWith('http')
           ? rawImage
@@ -148,7 +177,7 @@ export async function POST(req: Request) {
 
       const product_url = new URL(`/product/${product.slug}`, siteUrl).toString();
 
-      const sku = (variant as any).sku ?? null;
+      const sku = variant.sku ?? null;
 
       const name = product.name + (variant.color ? ' – ' + (variant.color.name ?? '') : '');
 
@@ -174,8 +203,8 @@ export async function POST(req: Request) {
       });
     }
 
-    const order_amount = line_items.reduce((s, li) => s + (li.total_amount as number), 0);
-    const order_tax_amount = line_items.reduce((s, li) => s + (li.total_tax_amount as number), 0);
+    const order_amount = line_items.reduce((s, li) => s + li.total_amount, 0);
+    const order_tax_amount = line_items.reduce((s, li) => s + li.total_tax_amount, 0);
 
     return NextResponse.json(
       {
