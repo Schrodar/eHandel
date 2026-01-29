@@ -5,8 +5,10 @@ export const metadata = {
   title: 'Admin – Dashboard',
 };
 
+export const dynamic = 'force-dynamic';
+
 async function getKpis() {
-  const [publishedCount, draftCount, lowStockCount, productsWithRelations] =
+  const [publishedCount, draftCount, lowStockVariantCount, productsWithRelations] =
     await Promise.all([
       prisma.product.count({ where: { published: true } }),
       prisma.product.count({ where: { published: false } }),
@@ -20,21 +22,44 @@ async function getKpis() {
       }),
     ]);
 
+  // Dashboard warning should be per product, based on the lowest stock among active variants.
+  // Count variants too (lowStockVariantCount) if you want that KPI later.
+  const lowStockProductCount = productsWithRelations.filter((product) => {
+    const activeStocks = product.variants
+      .filter((v) => v.active)
+      .map((v) => (typeof v.stock === 'number' ? v.stock : 0));
+    if (activeStocks.length === 0) return false;
+    const minStock = Math.min(...activeStocks);
+    return minStock < 3;
+  }).length;
+
   const issues: {
     productId: string;
     productName: string;
     type: string;
   }[] = [];
 
+  const lowStockProducts: {
+    productId: string;
+    productName: string;
+    minStock: number;
+  }[] = [];
+
   for (const product of productsWithRelations) {
     const activeVariants = product.variants.filter((v) => v.active);
 
-    if (product.published && !product.canonicalImage) {
-      issues.push({
-        productId: product.id,
-        productName: product.name,
-        type: 'Published men saknar canonical image',
-      });
+    const activeStocks = activeVariants.map((v) =>
+      typeof v.stock === 'number' ? v.stock : 0,
+    );
+    if (activeStocks.length > 0) {
+      const minStock = Math.min(...activeStocks);
+      if (minStock < 3) {
+        lowStockProducts.push({
+          productId: product.id,
+          productName: product.name,
+          minStock,
+        });
+      }
     }
 
     if (product.published && activeVariants.length === 0) {
@@ -71,7 +96,7 @@ async function getKpis() {
           type: 'Variant har negativt price override',
         });
       }
-      if (variant.active && !variant.images) {
+      if (variant.active && !variant.images && !product.canonicalImage) {
         issues.push({
           productId: product.id,
           productName: product.name,
@@ -81,11 +106,19 @@ async function getKpis() {
     }
   }
 
-  return { publishedCount, draftCount, lowStockCount, issues };
+  return {
+    publishedCount,
+    draftCount,
+    lowStockCount: lowStockProductCount,
+    lowStockVariantCount,
+    lowStockProducts,
+    issues,
+  };
 }
 
 export default async function AdminDashboardPage() {
-  const { publishedCount, draftCount, lowStockCount, issues } = await getKpis();
+  const { publishedCount, draftCount, lowStockCount, lowStockProducts, issues } =
+    await getKpis();
 
   return (
     <div className="space-y-8">
@@ -152,7 +185,7 @@ export default async function AdminDashboardPage() {
         </div>
         <div className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Low stock (aktiva varianter &lt; 3 i lager)
+            Low stock produkter (min aktiv variant &lt; 3)
           </div>
           <div className="mt-2 text-2xl font-semibold text-amber-900">
             {lowStockCount}
@@ -206,6 +239,46 @@ export default async function AdminDashboardPage() {
                 </Link>
               </li>
             ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-label="Låg lagernivå" className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Låg lagernivå
+          </h2>
+          <div className="text-xs text-slate-500">Tröskel: min aktiv variant &lt; 3</div>
+        </div>
+
+        {lowStockProducts.length === 0 ? (
+          <p className="text-xs text-slate-600">Inga produkter har låg lagernivå.</p>
+        ) : (
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
+            {lowStockProducts
+              .slice()
+              .sort((a, b) => a.minStock - b.minStock)
+              .map((p) => (
+                <li
+                  key={p.productId}
+                  className="flex items-center justify-between gap-3 px-4 py-3"
+                >
+                  <div>
+                    <div className="text-xs font-medium text-slate-900">
+                      {p.productName}
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      Min stock (aktiva varianter): {p.minStock}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/admin/products/${p.productId}?tab=variants`}
+                    className="text-xs font-medium text-slate-700 underline-offset-2 hover:underline"
+                  >
+                    Öppna
+                  </Link>
+                </li>
+              ))}
           </ul>
         )}
       </section>

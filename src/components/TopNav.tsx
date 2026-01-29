@@ -70,6 +70,13 @@ export function TopNav() {
             >
               Shop
             </Link>
+            <Link
+              href="/contact"
+              className="hover:opacity-90"
+              style={{ color: 'var(--accent-2)' }}
+            >
+              Info
+            </Link>
             <button
               onClick={openCart}
               className="btn-ghost"

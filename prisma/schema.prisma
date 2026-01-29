@@ -43,7 +43,7 @@ model Product {
     materialId String
     material   Material @relation(fields: [materialId], references: [id])
 
-    priceInCents Int
+    priceInCents Int?
     priceClass   String @default("standard")
     season       String @default("all")
 

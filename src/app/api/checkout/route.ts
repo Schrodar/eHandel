@@ -160,6 +160,12 @@ export async function POST(req: Request) {
       // Determine unit price in cents (öre -> cents means cents already vs öre; repo uses priceInCents)
       // Repo uses priceInCents (cents) — treat as öre-equivalent integer as requested.
       const unitPrice = variant.priceInCents ?? product.priceInCents;
+      if (unitPrice == null) {
+        return NextResponse.json(
+          { error: 'Price missing', variantId: variant.id, productId: product.id },
+          { status: 400 },
+        );
+      }
       if (!Number.isInteger(unitPrice)) {
         return NextResponse.json({ error: 'Invalid price in DB for variant', variantId: variant.id }, { status: 500 });
       }

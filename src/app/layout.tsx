@@ -11,7 +11,11 @@ export default function RootLayout({
     <html lang="sv">
       <body>
         <CartProvider>
-          <TransitionProvider>{children}</TransitionProvider>
+          <TransitionProvider>
+            <div className="flex flex-col min-h-screen">
+              {children}
+            </div>
+          </TransitionProvider>
         </CartProvider>
       </body>
     </html>

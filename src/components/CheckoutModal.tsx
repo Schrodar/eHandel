@@ -216,6 +216,20 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
             </p>
           </div>
 
+          <div className="text-xs text-slate-500 text-center space-y-1">
+            <p>
+              Genom att slutföra köpet godkänner du{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-emerald-600">
+                Köpvillkor
+              </a>{' '}
+              och{' '}
+              <a href="/returns" target="_blank" rel="noopener noreferrer" className="underline text-emerald-600">
+                Retur/Ångerrätt
+              </a>.
+            </p>
+            <p>14 dagars ångerrätt från mottagande.</p>
+          </div>
+
           <button
             type="submit"
             className="w-full rounded-full py-3 font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition"

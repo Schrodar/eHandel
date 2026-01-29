@@ -7,6 +7,8 @@ export const metadata = {
   title: 'Admin – Products',
 };
 
+export const dynamic = 'force-dynamic';
+
 type SearchParams = { [key: string]: string | string[] | undefined };
 
 function toStringParam(
@@ -34,10 +36,12 @@ function MobileProductListAccordion({
     <div className="space-y-3 md:hidden">
       {products.map((p) => {
         const activeVariants = p.variants.filter((v) => v.active);
+        const activeStocks = activeVariants.map((v) => (typeof v.stock === 'number' ? v.stock : 0));
+        const minActiveStock = activeStocks.length > 0 ? Math.min(...activeStocks) : null;
         const hasProblem =
           (p.published && !p.canonicalImage) ||
           (p.published && activeVariants.length === 0) ||
-          activeVariants.some((v) => !v.images);
+          activeVariants.some((v) => !v.images && !p.canonicalImage);
 
         return (
           <details
@@ -59,6 +63,11 @@ function MobileProductListAccordion({
                   >
                     {p.published ? 'Published' : 'Draft'}
                   </span>
+                  {minActiveStock != null && minActiveStock < 3 && (
+                    <span className="shrink-0 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      Low stock
+                    </span>
+                  )}
                   {hasProblem && (
                     <span className="shrink-0 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                       Problem
@@ -102,7 +111,7 @@ function MobileProductListAccordion({
                       Pris
                     </dt>
                     <dd className="mt-0.5 text-sm font-medium tabular-nums text-slate-900">
-                      {Math.round(p.priceInCents / 100)} kr
+                        {p.priceInCents != null ? `${Math.round(p.priceInCents / 100)} kr` : '—'}
                     </dd>
                   </div>
                   <div>
@@ -383,10 +392,15 @@ export default async function AdminProductsPage({
             <tbody>
               {products.map((p) => {
                 const activeVariants = p.variants.filter((v) => v.active);
+                const activeStocks = activeVariants.map((v) =>
+                  typeof v.stock === 'number' ? v.stock : 0,
+                );
+                const minActiveStock =
+                  activeStocks.length > 0 ? Math.min(...activeStocks) : null;
                 const hasProblem =
                   (p.published && !p.canonicalImage) ||
                   (p.published && activeVariants.length === 0) ||
-                  activeVariants.some((v) => !v.images);
+                  activeVariants.some((v) => !v.images && !p.canonicalImage);
 
                 return (
                   <tr
@@ -425,7 +439,7 @@ export default async function AdminProductsPage({
                       {p.material?.name ?? '–'}
                     </td>
                     <td className="px-3 py-2 text-right text-sm tabular-nums">
-                      {Math.round(p.priceInCents / 100)}
+                      {p.priceInCents != null ? Math.round(p.priceInCents / 100) : '—'}
                     </td>
                     <td className="px-3 py-2 text-center text-xs text-slate-700">
                       {activeVariants.length}/{p._count.variants}
@@ -445,6 +459,11 @@ export default async function AdminProductsPage({
                       {hasProblem && (
                         <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                           Problem
+                        </span>
+                      )}
+                      {minActiveStock != null && minActiveStock < 3 && (
+                        <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                          Low stock
                         </span>
                       )}
                     </td>

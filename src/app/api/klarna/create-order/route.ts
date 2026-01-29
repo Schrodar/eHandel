@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createOrderMock } from '@/lib/klarnaMock';
 import { createOrderDb } from '@/lib/orderService';
+import { sendOrderConfirmation } from '@/lib/emailService';
 
 export async function POST(req: Request) {
   try {
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
       totalInclVat: order_amount,
       totalVat: order_tax_amount,
     });
+
+    // Send confirmation email
+    await sendOrderConfirmation(dbOrder).catch((err) => console.error('Failed to send email:', err));
 
     return NextResponse.json({ order_id: dbOrder.id, klarna_order_id: klarnaOrder.order_id, confirmation_url: `/checkout/confirmation?order_id=${dbOrder.id}` });
   } catch (err) {

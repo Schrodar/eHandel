@@ -30,6 +30,8 @@ export const metadata = {
   title: 'Admin – Produkt',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminProductDetailPage({
   params,
   searchParams,
@@ -70,6 +72,10 @@ export default async function AdminProductDetailPage({
   }
 
   const activeVariants = product.variants.filter((v) => v.active);
+  const activeStocks = activeVariants
+    .map((v) => (typeof v.stock === 'number' ? v.stock : 0))
+    .filter((n) => Number.isFinite(n));
+  const minActiveStock = activeStocks.length > 0 ? Math.min(...activeStocks) : null;
   const klarnaReady =
     product.published &&
     activeVariants.length > 0 &&
@@ -77,7 +83,7 @@ export default async function AdminProductDetailPage({
       (v) =>
         v.sku &&
         v.stock >= 0 &&
-        v.images &&
+        (v.images || product.canonicalImage) &&
         (v.priceInCents ?? product.priceInCents) !== null &&
         (v.priceInCents ?? product.priceInCents) !== undefined,
     );
@@ -185,8 +191,9 @@ export default async function AdminProductDetailPage({
                 <div>
                   <div className="font-semibold">Kan inte publicera ännu</div>
                   <div className="mt-1 text-amber-800">
-                    Kräver canonicalImage + minst 1 aktiv variant som har SKU,
-                    bilder, stock ≥ 0 och pris (antingen baspris eller override).
+                    Kräver minst 1 aktiv variant med SKU, stock ≥ 0, bilder
+                    (antingen på varianten eller produktens canonical image) och
+                    pris (antingen på varianten eller produktens fallback-pris).
                   </div>
                 </div>
               ) : error === 'price-missing' ? (
@@ -308,30 +315,35 @@ export default async function AdminProductDetailPage({
                 </select>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
-                  PriceClass
-                </label>
-                <input
-                  type="text"
-                  name="priceClass"
-                  defaultValue={product.priceClass}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                />
+            <details className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-600">
+                Avancerat
+              </summary>
+              <div className="mt-3 grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
+                    PriceClass
+                  </label>
+                  <input
+                    type="text"
+                    name="priceClass"
+                    defaultValue={product.priceClass}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
+                    Season
+                  </label>
+                  <input
+                    type="text"
+                    name="season"
+                    defaultValue={product.season}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
-                  Season
-                </label>
-                <input
-                  type="text"
-                  name="season"
-                  defaultValue={product.season}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                />
-              </div>
-            </div>
+            </details>
           </section>
 
           <section className="space-y-3">
@@ -339,17 +351,23 @@ export default async function AdminProductDetailPage({
             <div className="grid max-w-full gap-4 md:max-w-sm md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
-                  Base price (SEK)
+                  Fallback price (SEK)
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   name="priceSek"
-                  defaultValue={(product.priceInCents / 100).toFixed(2)}
-                  required
+                  defaultValue={
+                    typeof product.priceInCents === 'number'
+                      ? (product.priceInCents / 100).toFixed(2)
+                      : ''
+                  }
                   className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Valfritt. Om tomt krävs pris per aktiv variant.
+                </p>
               </div>
             </div>
           </section>
@@ -367,6 +385,9 @@ export default async function AdminProductDetailPage({
                   defaultValue={product.canonicalImage ?? ''}
                   className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Valfritt. Kan användas som fallback-bild för varianter utan egna bilder.
+                </p>
               </div>
             </div>
           </section>
@@ -388,14 +409,14 @@ export default async function AdminProductDetailPage({
               </span>
             </div>
             <ul className="space-y-1 text-xs">
-              {product.published && !product.canonicalImage && (
-                <li className="text-amber-700">
-                  • Published men saknar canonicalImage
-                </li>
-              )}
               {product.published && activeVariants.length === 0 && (
                 <li className="text-amber-700">
                   • Published men har 0 aktiva varianter
+                </li>
+              )}
+              {minActiveStock != null && minActiveStock < 3 && (
+                <li className="text-amber-700">
+                  • Lågt lagersaldo (min aktiv variant: {minActiveStock})
                 </li>
               )}
             </ul>
@@ -439,6 +460,56 @@ export default async function AdminProductDetailPage({
 
       {tab === 'variants' && (
         <div className="space-y-6 rounded-xl border border-slate-200 bg-white p-6 text-sm">
+          {error && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
+              {error === 'variant-validation' ? (
+                <div>
+                  <div className="font-semibold">Valideringsfel</div>
+                  <div className="mt-1">Kontrollera variantfält och försök igen.</div>
+                </div>
+              ) : error === 'sku-duplicate' ? (
+                <div>
+                  <div className="font-semibold">SKU krockar</div>
+                  <div className="mt-1">Det finns redan en variant med samma SKU.</div>
+                </div>
+              ) : error === 'sku-missing' ? (
+                <div>
+                  <div className="font-semibold">SKU saknas</div>
+                  <div className="mt-1">SKU krävs för att aktivera en variant.</div>
+                </div>
+              ) : error === 'images-missing' ? (
+                <div>
+                  <div className="font-semibold">Bilder saknas</div>
+                  <div className="mt-1">Aktiva varianter måste ha minst en bild.</div>
+                </div>
+              ) : error === 'price-missing' ? (
+                <div>
+                  <div className="font-semibold">Pris saknas</div>
+                  <div className="mt-1">Sätt baspris på produkten eller pris-override på varianten.</div>
+                </div>
+              ) : error === 'stock-negative' ? (
+                <div>
+                  <div className="font-semibold">Ogiltigt lagersaldo</div>
+                  <div className="mt-1">Stock måste vara ≥ 0 för att aktivera en variant.</div>
+                </div>
+              ) : error === 'variant-product-mismatch' ? (
+                <div>
+                  <div className="font-semibold">Fel produktkontext</div>
+                  <div className="mt-1">Försök ladda om sidan och försök igen.</div>
+                </div>
+              ) : error === 'toggle-failed' ? (
+                <div>
+                  <div className="font-semibold">Kunde inte uppdatera variant</div>
+                  <div className="mt-1">Försök igen. Om felet kvarstår, kontrollera databasen/loggar.</div>
+                </div>
+              ) : (
+                <div>
+                  <div className="font-semibold">Något gick fel</div>
+                  <div className="mt-1">Fel: {error}</div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-slate-900">Varianter</h2>
           </div>
@@ -456,18 +527,21 @@ export default async function AdminProductDetailPage({
                       )
                     : [];
                   const firstImage = images[0];
-                  const hasImages = images.length > 0;
+                  const hasOwnImages = images.length > 0;
+                  const hasEffectiveImages =
+                    hasOwnImages || Boolean(product.canonicalImage);
                   const isEditing = editVariantId === v.id;
                   const editHref = `/admin/products/${product.id}?tab=variants&editVariant=${encodeURIComponent(
                     v.id,
                   )}`;
                   const cancelHref = `/admin/products/${product.id}?tab=variants`;
-                  const imagesJsonDefault = hasImages ? JSON.stringify(images) : '';
+                  const imagesTextDefault = hasOwnImages ? images.join('\n') : '';
                   const priceOverrideSekDefault =
                     v.priceInCents != null ? (v.priceInCents / 100).toFixed(2) : '';
+                  const effectivePriceInCents = v.priceInCents ?? product.priceInCents;
                   const priceDisplaySek =
-                    (v.priceInCents ?? product.priceInCents) != null
-                      ? ((v.priceInCents ?? product.priceInCents) / 100).toFixed(2)
+                    effectivePriceInCents != null
+                      ? (effectivePriceInCents / 100).toFixed(2)
                       : '—';
 
                   return (
@@ -480,12 +554,19 @@ export default async function AdminProductDetailPage({
                         <div className="min-w-0">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 shrink-0">
-                              {hasImages ? (
+                              {hasOwnImages ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={firstImage}
                                   alt={v.sku}
                                   className="h-10 w-10 rounded-md object-cover ring-1 ring-slate-200"
+                                />
+                              ) : product.canonicalImage ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={product.canonicalImage}
+                                  alt={v.sku}
+                                  className="h-10 w-10 rounded-md object-cover ring-1 ring-slate-200 opacity-80"
                                 />
                               ) : (
                                 <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-200 text-[10px] text-slate-400">
@@ -536,7 +617,7 @@ export default async function AdminProductDetailPage({
                               {v.id}
                             </div>
                           </div>
-                          {!hasImages && (
+                          {!hasEffectiveImages && (
                             <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-800">
                               Saknar bilder (krävs för aktiv variant).
                             </div>
@@ -636,7 +717,7 @@ export default async function AdminProductDetailPage({
 
                               <div>
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                  Price override (SEK)
+                                  Price (SEK)
                                 </label>
                                 <input
                                   type="number"
@@ -650,15 +731,18 @@ export default async function AdminProductDetailPage({
 
                               <div className="md:col-span-2">
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                  Images JSON
+                                  Images (en per rad)
                                 </label>
                                 <textarea
-                                  name="imagesJson"
+                                  name="imagesText"
                                   rows={2}
-                                  placeholder='["/images/variant1.jpg"]'
-                                  defaultValue={imagesJsonDefault}
+                                  placeholder="/images/variant1.jpg"
+                                  defaultValue={imagesTextDefault}
                                   className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                 />
+                                <p className="mt-1 text-[10px] text-slate-500">
+                                  Tomt = använd produktens canonical image som fallback.
+                                </p>
                               </div>
 
                               <div className="flex items-end gap-2">
@@ -704,7 +788,7 @@ export default async function AdminProductDetailPage({
                     <th className="px-3 py-2">SKU</th>
                     <th className="px-3 py-2">Color</th>
                     <th className="px-3 py-2 text-right">Stock</th>
-                    <th className="px-3 py-2 text-right">Price override</th>
+                    <th className="px-3 py-2 text-right">Price</th>
                     <th className="px-3 py-2 text-center">Badges</th>
                     <th className="px-3 py-2 text-center">Active</th>
                     <th className="px-3 py-2 text-right">Actions</th>
@@ -719,28 +803,41 @@ export default async function AdminProductDetailPage({
                         )
                       : [];
                     const firstImage = images[0];
-                    const hasImages = images.length > 0;
+                    const hasOwnImages = images.length > 0;
+                    const hasEffectiveImages =
+                      hasOwnImages || Boolean(product.canonicalImage);
                     const isEditing = editVariantId === v.id;
                     const editHref = `/admin/products/${product.id}?tab=variants&editVariant=${encodeURIComponent(
                       v.id,
                     )}`;
                     const cancelHref = `/admin/products/${product.id}?tab=variants`;
-                    const imagesJsonDefault = hasImages
-                      ? JSON.stringify(images)
-                      : '';
+                    const imagesTextDefault = hasOwnImages ? images.join('\n') : '';
                     const priceOverrideSekDefault =
                       v.priceInCents != null ? (v.priceInCents / 100).toFixed(2) : '';
+
+                    const effectivePriceInCents = v.priceInCents ?? product.priceInCents;
+                    const effectivePriceLabel =
+                      effectivePriceInCents != null
+                        ? (effectivePriceInCents / 100).toFixed(2)
+                        : '—';
 
                     return (
                       <Fragment key={v.id}>
                         <tr className="border-b border-slate-100 last:border-0">
                           <td className="px-3 py-2">
-                            {hasImages ? (
+                            {hasOwnImages ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={firstImage}
                                 alt={v.sku}
                                 className="h-8 w-8 rounded-md object-cover ring-1 ring-slate-200"
+                              />
+                            ) : product.canonicalImage ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={product.canonicalImage}
+                                alt={v.sku}
+                                className="h-8 w-8 rounded-md object-cover ring-1 ring-slate-200 opacity-80"
                               />
                             ) : (
                               <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-slate-200 text-[9px] text-slate-400">
@@ -758,13 +855,11 @@ export default async function AdminProductDetailPage({
                             {v.stock}
                           </td>
                           <td className="px-3 py-2 text-right text-[11px] tabular-nums">
-                            {v.priceInCents != null
-                              ? (v.priceInCents / 100).toFixed(2)
-                              : '—'}
+                            {effectivePriceLabel}
                           </td>
                           <td className="px-3 py-2 text-center text-[10px]">
                             <div className="flex flex-wrap items-center justify-center gap-1">
-                              {!hasImages && (
+                              {!hasEffectiveImages && (
                                 <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                                   No images
                                 </span>
@@ -772,6 +867,11 @@ export default async function AdminProductDetailPage({
                               {v.stock === 0 && (
                                 <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
                                   Stock 0
+                                </span>
+                              )}
+                              {v.priceInCents == null && product.priceInCents != null && (
+                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
+                                  Inherited price
                                 </span>
                               )}
                             </div>
@@ -875,7 +975,7 @@ export default async function AdminProductDetailPage({
 
                                 <div>
                                   <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                    Price override (SEK)
+                                    Price (SEK)
                                   </label>
                                   <input
                                     type="number"
@@ -889,17 +989,17 @@ export default async function AdminProductDetailPage({
 
                                 <div className="sm:col-span-2">
                                   <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                    Images JSON
+                                    Images (en per rad)
                                   </label>
                                   <textarea
-                                    name="imagesJson"
+                                    name="imagesText"
                                     rows={2}
-                                    placeholder='["/images/variant1.jpg"]'
-                                    defaultValue={imagesJsonDefault}
+                                    placeholder="/images/variant1.jpg"
+                                    defaultValue={imagesTextDefault}
                                     className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                   />
                                   <p className="mt-1 text-[10px] text-slate-500">
-                                    Krävs om varianten ska vara aktiv.
+                                    Tomt = använd produktens canonical image som fallback.
                                   </p>
                                 </div>
 
@@ -958,9 +1058,12 @@ export default async function AdminProductDetailPage({
                 <input
                   type="text"
                   name="sku"
-                  required
+                  placeholder="Lämna tomt = auto (PRODUCT-SLUG + COLOR)"
                   className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Auto: {product.slug.toUpperCase()}-COLOR (redigerbar vid behov).
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
@@ -992,7 +1095,7 @@ export default async function AdminProductDetailPage({
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                  Price override (SEK)
+                  Price (SEK)
                 </label>
                 <input
                   type="number"
@@ -1004,16 +1107,16 @@ export default async function AdminProductDetailPage({
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                  Images JSON
+                  Images (en per rad)
                 </label>
                 <textarea
-                  name="imagesJson"
+                  name="imagesText"
                   rows={2}
-                  placeholder='["/images/variant1.jpg"]'
+                  placeholder="/images/variant1.jpg"
                   className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                 />
                 <p className="mt-1 text-[10px] text-slate-500">
-                  Krävs om varianten ska vara aktiv.
+                  Tomt = använd produktens canonical image som fallback. Krävs för aktiv variant.
                 </p>
               </div>
               <div className="flex items-end gap-2">
