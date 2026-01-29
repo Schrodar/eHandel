@@ -1,6 +1,6 @@
 export const siteConfig = {
   company: {
-    name: 'Utö E-handel', // Or inferred from "Enskild firma" or context? Using 'Utö E-handel' as placeholder or "Din Butik" if not specified. Prompt says "Företagsnamn", listing data below. Prompt does NOT specify the name "Utö E-handel" explicitly in the data section, just "Företagsnamn". But uses "Utö ehandel" in the path. I will use the organization number's related name or "Utö E-handel" as a safe bet, or just "Min Butik".
+    // Or inferred from "Enskild firma" or context? Using 'Utö E-handel' as placeholder or "Din Butik" if not specified. Prompt says "Företagsnamn", listing data below. Prompt does NOT specify the name "Utö E-handel" explicitly in the data section, just "Företagsnamn". But uses "Utö ehandel" in the path. I will use the organization number's related name or "Utö E-handel" as a safe bet, or just "Min Butik".
     // Wait, the prompt says "Företagsnamn" under "Mål" but doesn't give a value for it in the "Företagsuppgifter" section.
     // "Företagsform: Enskild firma"
     // "Organisationsnummer: 881027-0093"
