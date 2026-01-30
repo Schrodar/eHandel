@@ -128,7 +128,7 @@ export default async function AdminProductDetailPage({
             Preview
           </Link>
           {product.published ? (
-            <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={true}>
+            <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={false}>
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
@@ -138,7 +138,7 @@ export default async function AdminProductDetailPage({
               </button>
             </AdminForm>
           ) : (
-            <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={true}>
+            <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={false}>
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
@@ -233,6 +233,7 @@ export default async function AdminProductDetailPage({
             className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 text-sm md:p-6"
             toastMessage="Sparat"
             pendingMessage="Sparar…"
+            showOverlay={false}
           >
             <input type="hidden" name="id" value={product.id} />
             <input
@@ -429,7 +430,7 @@ export default async function AdminProductDetailPage({
 
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             {product.published ? (
-              <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={true}>
+              <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={false}>
                 <input type="hidden" name="id" value={product.id} />
                 <button
                   type="submit"
@@ -439,7 +440,7 @@ export default async function AdminProductDetailPage({
                 </button>
               </AdminForm>
             ) : (
-              <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={true}>
+              <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={false}>
                 <input type="hidden" name="id" value={product.id} />
                 <button
                   type="submit"
@@ -628,7 +629,7 @@ export default async function AdminProductDetailPage({
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-2">
-                          <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={true}>
+                          <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={false}>
                             <input type="hidden" name="id" value={v.id} />
                             <input
                               type="hidden"
@@ -666,7 +667,7 @@ export default async function AdminProductDetailPage({
 
                         {isEditing && (
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <AdminForm action={updateVariant} className="grid gap-3 md:grid-cols-3" toastMessage="Sparat" pendingMessage="Sparar…" showOverlay={true}>
+                            <AdminForm action={updateVariant} className="grid gap-3 md:grid-cols-3" toastMessage="Sparat" pendingMessage="Sparar…" showOverlay={false}>
                               <input type="hidden" name="id" value={v.id} />
                               <input
                                 type="hidden"
@@ -880,7 +881,7 @@ export default async function AdminProductDetailPage({
                             </div>
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={true}>
+                            <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={false}>
                               <input type="hidden" name="id" value={v.id} />
                               <input
                                 type="hidden"

@@ -108,7 +108,7 @@ export default async function AdminMaterialsPage({
                   <td className="px-3 py-2 text-sm text-slate-800">{m.name}</td>
                   <td className="px-3 py-2 text-right text-xs">
                     <div className="inline-flex items-center gap-2">
-                      <AdminForm action={upsertMaterial} className="inline-flex gap-2" toastMessage="Sparat" pendingMessage="Sparar…">
+                      <AdminForm action={upsertMaterial} className="inline-flex gap-2" toastMessage="Sparat" pendingMessage="Sparar…" showOverlay={false}>
                         <input type="hidden" name="id" value={m.id} />
                         <input
                           type="text"
@@ -144,7 +144,7 @@ export default async function AdminMaterialsPage({
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Nytt material
           </h2>
-          <AdminForm action={upsertMaterial} className="space-y-3" toastMessage="Skapat" pendingMessage="Skapar…">
+          <AdminForm action={upsertMaterial} className="space-y-3" toastMessage="Skapat" pendingMessage="Skapar…" showOverlay={false}>
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Namn

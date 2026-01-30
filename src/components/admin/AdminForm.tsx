@@ -33,6 +33,17 @@ function Spinner() {
   );
 }
 
+function PendingToast({ message }: { message: string }) {
+  return (
+    <div className="fixed right-4 top-4 z-40">
+      <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-lg">
+        <Spinner />
+        <div className="font-medium">{message}</div>
+      </div>
+    </div>
+  );
+}
+
 function PendingOverlay({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-white/40 backdrop-blur-sm">
@@ -96,7 +107,7 @@ function FormFeedback({
 
   return (
     <>
-      {pending && showOverlay && <PendingOverlay message={pendingMessage} />}
+      {pending && (showOverlay ? <PendingOverlay message={pendingMessage} /> : <PendingToast message={pendingMessage} />)}
 
       {showLocalToast && toastMessage && (
         <div
@@ -128,7 +139,7 @@ export default function AdminForm({
   toastMessage = 'Sparat',
   toastVariant = 'success',
   pendingMessage = 'Sparar…',
-  showOverlay = true,
+  showOverlay = false,
   ...formProps
 }: AdminFormProps) {
   return (

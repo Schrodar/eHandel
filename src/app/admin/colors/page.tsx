@@ -126,6 +126,7 @@ export default async function AdminColorsPage({
                         className="inline-flex items-center gap-2"
                         toastMessage="Sparat"
                         pendingMessage="Sparar…"
+                        showOverlay={false}
                       >
                         <input type="hidden" name="id" value={c.id} />
                         <input
@@ -167,7 +168,7 @@ export default async function AdminColorsPage({
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
           <h2 className="mb-3 text-sm font-semibold text-slate-900">Ny färg</h2>
-          <AdminForm action={upsertColor} className="space-y-3" toastMessage="Skapad" pendingMessage="Skapar…">
+          <AdminForm action={upsertColor} className="space-y-3" toastMessage="Skapad" pendingMessage="Skapar…" showOverlay={false}>
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Namn
