@@ -47,26 +47,64 @@ export default async function AdminProductDetailPage({
   const editVariantId = toStringParam(resolvedSearchParams?.editVariant);
   const error = toStringParam(resolvedSearchParams?.error);
 
-  const [product, categories, materials, colors] = await Promise.all([
-    prisma.product.findFirst({
-      where: {
-        OR: [{ id }, { slug: id }],
-      },
-      include: {
-        category: true,
-        material: true,
-        variants: {
-          include: {
-            color: true,
-          },
-          orderBy: { sku: 'asc' },
+  const needsCategoryMaterialLists = tab === 'overview';
+  const needsColorList = tab === 'variants';
+
+  const product = await prisma.product.findFirst({
+    where: {
+      OR: [{ id }, { slug: id }],
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      description: true,
+      categoryId: true,
+      materialId: true,
+      priceInCents: true,
+      priceClass: true,
+      season: true,
+      canonicalImage: true,
+      attributes: true,
+      published: true,
+      variants: {
+        select: {
+          id: true,
+          sku: true,
+          colorId: true,
+          color: { select: { id: true, name: true, hex: true } },
+          images: true,
+          priceInCents: true,
+          stock: true,
+          active: true,
         },
+        orderBy: { sku: 'asc' },
       },
-    }),
-    prisma.category.findMany({ orderBy: { name: 'asc' } }),
-    prisma.material.findMany({ orderBy: { name: 'asc' } }),
-    prisma.color.findMany({ orderBy: { name: 'asc' } }),
-  ]);
+    },
+  });
+
+  const categories: Array<{ id: string; name: string }> =
+    needsCategoryMaterialLists
+      ? await prisma.category.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+
+  const materials: Array<{ id: string; name: string }> =
+    needsCategoryMaterialLists
+      ? await prisma.material.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : [];
+
+  const colors: Array<{ id: string; name: string }> = needsColorList
+    ? await prisma.color.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      })
+    : [];
 
   if (!product) {
     notFound();

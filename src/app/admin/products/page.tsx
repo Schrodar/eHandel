@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
 import AdminForm from '@/components/admin/AdminForm';
@@ -19,30 +19,58 @@ function toStringParam(
   return value ?? undefined;
 }
 
+function toIntParam(
+  value: string | string[] | undefined,
+  fallback: number,
+): number {
+  const s = toStringParam(value);
+  if (!s) return fallback;
+  const n = Number.parseInt(s, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clamp(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, n));
+}
+
 type ProductRow = Prisma.ProductGetPayload<{
-  include: {
-    category: true;
-    material: true;
-    variants: true;
+  select: {
+    id: true;
+    name: true;
+    slug: true;
+    published: true;
+    canonicalImage: true;
+    priceInCents: true;
+    category: { select: { id: true; name: true } };
+    material: { select: { id: true; name: true } };
     _count: { select: { variants: true } };
   };
 }>;
 
+type VariantStats = {
+  activeCount: number;
+  minActiveStock: number | null;
+  activeMissingImagesCount: number;
+};
+
 function MobileProductListAccordion({
   products,
+  statsById,
 }: {
   products: ProductRow[];
+  statsById: Record<string, VariantStats | undefined>;
 }) {
   return (
     <div className="space-y-3 md:hidden">
       {products.map((p) => {
-        const activeVariants = p.variants.filter((v) => v.active);
-        const activeStocks = activeVariants.map((v) => (typeof v.stock === 'number' ? v.stock : 0));
-        const minActiveStock = activeStocks.length > 0 ? Math.min(...activeStocks) : null;
+        const stats = statsById[p.id];
+        const activeCount = stats?.activeCount ?? 0;
+        const minActiveStock = stats?.minActiveStock ?? null;
+        const hasActiveMissingImages = (stats?.activeMissingImagesCount ?? 0) > 0;
         const hasProblem =
           (p.published && !p.canonicalImage) ||
-          (p.published && activeVariants.length === 0) ||
-          activeVariants.some((v) => !v.images && !p.canonicalImage);
+          (p.published && activeCount === 0) ||
+          (!p.canonicalImage && hasActiveMissingImages);
 
         return (
           <details
@@ -120,7 +148,7 @@ function MobileProductListAccordion({
                       Varianter
                     </dt>
                     <dd className="mt-0.5 text-sm font-medium tabular-nums text-slate-900">
-                      {activeVariants.length}/{p._count.variants}
+                      {activeCount}/{p._count.variants}
                     </dd>
                   </div>
                 </div>
@@ -176,6 +204,9 @@ export default async function AdminProductsPage({
   const season = toStringParam(searchParams?.season) ?? '';
   const sort = toStringParam(searchParams?.sort) ?? 'name-asc';
 
+  const requestedPage = Math.max(1, toIntParam(searchParams?.page, 1));
+  const pageSize = clamp(toIntParam(searchParams?.pageSize, 25), 10, 100);
+
   const where: Prisma.ProductWhereInput = {};
 
   if (q) {
@@ -215,20 +246,138 @@ export default async function AdminProductsPage({
   }
   // "Senast ändrad" kräver timestamps i modellen och kan läggas till senare
 
-  const [products, categories, materials] = await Promise.all([
-    prisma.product.findMany({
+  const {
+    products,
+    totalCount,
+    totalPages,
+    effectivePage,
+    skip,
+    categories,
+    materials,
+  } = await prisma.$transaction(async (tx) => {
+    const totalCount = await tx.product.count({ where });
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const effectivePage = clamp(requestedPage, 1, totalPages);
+    const skip = (effectivePage - 1) * pageSize;
+
+    const products = await tx.product.findMany({
       where,
-      include: {
-        category: true,
-        material: true,
-        variants: true,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        published: true,
+        canonicalImage: true,
+        priceInCents: true,
+        category: { select: { id: true, name: true } },
+        material: { select: { id: true, name: true } },
         _count: { select: { variants: true } },
       },
       orderBy,
-    }),
-    prisma.category.findMany({ orderBy: { name: 'asc' } }),
-    prisma.material.findMany({ orderBy: { name: 'asc' } }),
-  ]);
+      skip,
+      take: pageSize,
+    });
+
+    const categories = await tx.category.findMany({ orderBy: { name: 'asc' } });
+    const materials = await tx.material.findMany({ orderBy: { name: 'asc' } });
+
+    return {
+      products,
+      totalCount,
+      totalPages,
+      effectivePage,
+      skip,
+      categories,
+      materials,
+    };
+  });
+
+  const productIds = products.map((p) => p.id);
+
+  const statsById: Record<string, VariantStats | undefined> = Object.create(null);
+
+  if (productIds.length > 0) {
+    const [activeAgg, missingImagesAgg] = await prisma.$transaction([
+      prisma.productVariant.groupBy({
+        by: ['productId'],
+        where: {
+          productId: { in: productIds },
+          active: true,
+        },
+        orderBy: { productId: 'asc' },
+        _count: { productId: true },
+        _min: { stock: true },
+      }),
+      prisma.productVariant.groupBy({
+        by: ['productId'],
+        where: {
+          productId: { in: productIds },
+          active: true,
+          OR: [
+            { images: { equals: Prisma.DbNull } },
+            { images: { equals: Prisma.JsonNull } },
+          ],
+        },
+        orderBy: { productId: 'asc' },
+        _count: { productId: true },
+      }),
+    ]);
+
+    for (const row of activeAgg) {
+      const activeCount =
+        row._count &&
+        typeof row._count === 'object' &&
+        'productId' in row._count &&
+        typeof (row._count as { productId?: unknown }).productId === 'number'
+          ? ((row._count as { productId: number }).productId ?? 0)
+          : 0;
+
+      statsById[row.productId] = {
+        activeCount,
+        minActiveStock: row._min?.stock ?? null,
+        activeMissingImagesCount: 0,
+      };
+    }
+
+    for (const row of missingImagesAgg) {
+      const missingCount =
+        row._count &&
+        typeof row._count === 'object' &&
+        'productId' in row._count &&
+        typeof (row._count as { productId?: unknown }).productId === 'number'
+          ? ((row._count as { productId: number }).productId ?? 0)
+          : 0;
+
+      const existing = statsById[row.productId];
+      if (existing) {
+        existing.activeMissingImagesCount = missingCount;
+      } else {
+        statsById[row.productId] = {
+          activeCount: 0,
+          minActiveStock: null,
+          activeMissingImagesCount: missingCount,
+        };
+      }
+    }
+  }
+
+  const from = totalCount === 0 ? 0 : skip + 1;
+  const to = Math.min(totalCount, skip + products.length);
+
+  const makeHref = (nextPage: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set('q', q);
+    if (publishedFilter && publishedFilter !== 'all') sp.set('published', publishedFilter);
+    if (categoryId) sp.set('categoryId', categoryId);
+    if (materialId) sp.set('materialId', materialId);
+    if (priceClass) sp.set('priceClass', priceClass);
+    if (season) sp.set('season', season);
+    if (sort) sp.set('sort', sort);
+    sp.set('page', String(nextPage));
+    sp.set('pageSize', String(pageSize));
+    const qs = sp.toString();
+    return qs ? `/admin/products?${qs}` : '/admin/products';
+  };
 
   return (
     <div className="space-y-6">
@@ -255,7 +404,8 @@ export default async function AdminProductsPage({
         </div>
       </header>
 
-  <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-4">
+    <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-4">
+      <input type="hidden" name="page" value="1" />
         <div className="md:col-span-2">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
             Sök
@@ -295,6 +445,23 @@ export default async function AdminProductsPage({
             <option value="name-desc">Namn Ö–A</option>
             <option value="price-asc">Pris lågt → högt</option>
             <option value="price-desc">Pris högt → lågt</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
+            Per sida
+          </label>
+          <select
+            name="pageSize"
+            defaultValue={String(pageSize)}
+            className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+          >
+            {[10, 25, 50, 100].map((n) => (
+              <option key={n} value={String(n)}>
+                {n}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -371,7 +538,7 @@ export default async function AdminProductsPage({
         </p>
       ) : (
         <>
-          <MobileProductListAccordion products={products} />
+          <MobileProductListAccordion products={products} statsById={statsById} />
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white text-sm md:block">
           <table className="min-w-full text-left">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -392,16 +559,14 @@ export default async function AdminProductsPage({
             </thead>
             <tbody>
               {products.map((p) => {
-                const activeVariants = p.variants.filter((v) => v.active);
-                const activeStocks = activeVariants.map((v) =>
-                  typeof v.stock === 'number' ? v.stock : 0,
-                );
-                const minActiveStock =
-                  activeStocks.length > 0 ? Math.min(...activeStocks) : null;
+                const stats = statsById[p.id];
+                const activeCount = stats?.activeCount ?? 0;
+                const minActiveStock = stats?.minActiveStock ?? null;
+                const hasActiveMissingImages = (stats?.activeMissingImagesCount ?? 0) > 0;
                 const hasProblem =
                   (p.published && !p.canonicalImage) ||
-                  (p.published && activeVariants.length === 0) ||
-                  activeVariants.some((v) => !v.images && !p.canonicalImage);
+                  (p.published && activeCount === 0) ||
+                  (!p.canonicalImage && hasActiveMissingImages);
 
                 return (
                   <tr
@@ -443,7 +608,7 @@ export default async function AdminProductsPage({
                       {p.priceInCents != null ? Math.round(p.priceInCents / 100) : '—'}
                     </td>
                     <td className="px-3 py-2 text-center text-xs text-slate-700">
-                      {activeVariants.length}/{p._count.variants}
+                      {activeCount}/{p._count.variants}
                     </td>
                     <td className="px-3 py-2 text-center text-xs">
                       <span
@@ -489,6 +654,38 @@ export default async function AdminProductsPage({
               })}
             </tbody>
           </table>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-slate-500">
+              Visar {from}–{to} av {totalCount} (sida {effectivePage}/{totalPages})
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              {effectivePage > 1 ? (
+                <Link
+                  href={makeHref(effectivePage - 1)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Föregående
+                </Link>
+              ) : (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-400">
+                  Föregående
+                </span>
+              )}
+              {effectivePage < totalPages ? (
+                <Link
+                  href={makeHref(effectivePage + 1)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Nästa
+                </Link>
+              ) : (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-400">
+                  Nästa
+                </span>
+              )}
+            </div>
           </div>
         </>
       )}

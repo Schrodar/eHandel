@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { Prisma } from '@prisma/client';
 
 export const metadata = {
   title: 'Admin – Dashboard',
@@ -8,30 +9,122 @@ export const metadata = {
 export const dynamic = 'force-dynamic';
 
 async function getKpis() {
-  const [publishedCount, draftCount, lowStockVariantCount, productsWithRelations] =
-    await Promise.all([
-      prisma.product.count({ where: { published: true } }),
-      prisma.product.count({ where: { published: false } }),
-      prisma.productVariant.count({
-        where: { active: true, stock: { lt: 3 } },
-      }),
-      prisma.product.findMany({
-        include: {
-          variants: true,
-        },
-      }),
-    ]);
+  const LOW_STOCK_THRESHOLD = 3;
+  const LIMIT = 50;
 
-  // Dashboard warning should be per product, based on the lowest stock among active variants.
-  // Count variants too (lowStockVariantCount) if you want that KPI later.
-  const lowStockProductCount = productsWithRelations.filter((product) => {
-    const activeStocks = product.variants
-      .filter((v) => v.active)
-      .map((v) => (typeof v.stock === 'number' ? v.stock : 0));
-    if (activeStocks.length === 0) return false;
-    const minStock = Math.min(...activeStocks);
-    return minStock < 3;
-  }).length;
+  const [
+    publishedCount,
+    draftCount,
+    lowStockVariantCount,
+    activeVariantAgg,
+    publishedNoActiveVariants,
+    publishedNoCanonicalImage,
+    activeVariantsMissingImages,
+    negativeStockVariants,
+    negativePriceVariants,
+    emptySkuVariants,
+  ] = await prisma.$transaction([
+    prisma.product.count({ where: { published: true } }),
+    prisma.product.count({ where: { published: false } }),
+    prisma.productVariant.count({
+      where: { active: true, stock: { lt: LOW_STOCK_THRESHOLD } },
+    }),
+    prisma.productVariant.groupBy({
+      by: ['productId'],
+      where: { active: true },
+      orderBy: { productId: 'asc' },
+      _count: { _all: true },
+      _min: { stock: true },
+    }),
+    prisma.product.findMany({
+      where: { published: true, variants: { none: { active: true } } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      take: LIMIT,
+    }),
+    prisma.product.findMany({
+      where: { published: true, canonicalImage: null },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      take: LIMIT,
+    }),
+    prisma.productVariant.findMany({
+      where: {
+        active: true,
+        OR: [
+          { images: { equals: Prisma.DbNull } },
+          { images: { equals: Prisma.JsonNull } },
+        ],
+        product: { canonicalImage: null },
+      },
+      select: {
+        id: true,
+        sku: true,
+        product: { select: { id: true, name: true } },
+      },
+      take: LIMIT,
+    }),
+    prisma.productVariant.findMany({
+      where: { stock: { lt: 0 } },
+      select: {
+        id: true,
+        sku: true,
+        product: { select: { id: true, name: true } },
+      },
+      take: LIMIT,
+    }),
+    prisma.productVariant.findMany({
+      where: { priceInCents: { lt: 0 } },
+      select: {
+        id: true,
+        sku: true,
+        product: { select: { id: true, name: true } },
+      },
+      take: LIMIT,
+    }),
+    prisma.productVariant.findMany({
+      where: { sku: '' },
+      select: {
+        id: true,
+        sku: true,
+        product: { select: { id: true, name: true } },
+      },
+      take: LIMIT,
+    }),
+  ]);
+
+  const lowStockAgg = activeVariantAgg
+    .map((row) => ({
+      productId: row.productId,
+      minStock: row._min?.stock ?? null,
+    }))
+    .filter((row) => (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD)
+    .map((row) => ({
+      productId: row.productId,
+      minStock: row.minStock ?? 0,
+    }));
+
+  const lowStockProductIds = lowStockAgg.map((r) => r.productId);
+  const lowStockProductNames =
+    lowStockProductIds.length === 0
+      ? []
+      : await prisma.product.findMany({
+          where: { id: { in: lowStockProductIds } },
+          select: { id: true, name: true },
+        });
+  const nameById = new Map(lowStockProductNames.map((p) => [p.id, p.name] as const));
+
+  const lowStockProducts: {
+    productId: string;
+    productName: string;
+    minStock: number;
+  }[] = lowStockAgg
+    .map((row) => ({
+      productId: row.productId,
+      productName: nameById.get(row.productId) ?? row.productId,
+      minStock: row.minStock,
+    }))
+    .slice(0, LIMIT);
 
   const issues: {
     productId: string;
@@ -39,80 +132,61 @@ async function getKpis() {
     type: string;
   }[] = [];
 
-  const lowStockProducts: {
-    productId: string;
-    productName: string;
-    minStock: number;
-  }[] = [];
+  for (const p of publishedNoActiveVariants) {
+    issues.push({
+      productId: p.id,
+      productName: p.name,
+      type: 'Published men har 0 aktiva varianter',
+    });
+  }
 
-  for (const product of productsWithRelations) {
-    const activeVariants = product.variants.filter((v) => v.active);
+  for (const p of publishedNoCanonicalImage) {
+    issues.push({
+      productId: p.id,
+      productName: p.name,
+      type: 'Published men saknar canonical image',
+    });
+  }
 
-    const activeStocks = activeVariants.map((v) =>
-      typeof v.stock === 'number' ? v.stock : 0,
-    );
-    if (activeStocks.length > 0) {
-      const minStock = Math.min(...activeStocks);
-      if (minStock < 3) {
-        lowStockProducts.push({
-          productId: product.id,
-          productName: product.name,
-          minStock,
-        });
-      }
-    }
+  for (const v of activeVariantsMissingImages) {
+    issues.push({
+      productId: v.product.id,
+      productName: v.product.name,
+      type: 'Aktiv variant saknar bilder (och produkten saknar canonical image)',
+    });
+  }
 
-    if (product.published && activeVariants.length === 0) {
-      issues.push({
-        productId: product.id,
-        productName: product.name,
-        type: 'Published men har 0 aktiva varianter',
-      });
-    }
+  for (const v of negativeStockVariants) {
+    issues.push({
+      productId: v.product.id,
+      productName: v.product.name,
+      type: 'Variant har stock < 0',
+    });
+  }
 
-    for (const variant of product.variants) {
-      if (!variant.sku) {
-        issues.push({
-          productId: product.id,
-          productName: product.name,
-          type: 'Variant saknar SKU',
-        });
-      }
-      if (variant.stock < 0) {
-        issues.push({
-          productId: product.id,
-          productName: product.name,
-          type: 'Variant har stock < 0',
-        });
-      }
-      if (
-        variant.priceInCents !== null &&
-        variant.priceInCents !== undefined &&
-        variant.priceInCents < 0
-      ) {
-        issues.push({
-          productId: product.id,
-          productName: product.name,
-          type: 'Variant har negativt price override',
-        });
-      }
-      if (variant.active && !variant.images && !product.canonicalImage) {
-        issues.push({
-          productId: product.id,
-          productName: product.name,
-          type: 'Aktiv variant saknar bilder',
-        });
-      }
-    }
+  for (const v of negativePriceVariants) {
+    issues.push({
+      productId: v.product.id,
+      productName: v.product.name,
+      type: 'Variant har negativt price override',
+    });
+  }
+
+  for (const v of emptySkuVariants) {
+    issues.push({
+      productId: v.product.id,
+      productName: v.product.name,
+      type: 'Variant har tom SKU',
+    });
   }
 
   return {
     publishedCount,
     draftCount,
-    lowStockCount: lowStockProductCount,
+    lowStockCount: lowStockProducts.length,
     lowStockVariantCount,
     lowStockProducts,
-    issues,
+    issues: issues.slice(0, LIMIT),
   };
 }
 
