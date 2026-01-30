@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { Suspense } from 'react';
+import AdminToaster from '@/components/admin/AdminToaster';
 
 type AdminLayoutProps = {
   children: ReactNode;
@@ -16,6 +18,9 @@ const navItems = [
 export default function AdminLayout({ children }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <Suspense fallback={null}>
+        <AdminToaster />
+      </Suspense>
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 sm:px-8">
         <aside className="hidden w-56 shrink-0 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:block">
           <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">

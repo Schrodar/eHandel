@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import AdminForm from '@/components/admin/AdminForm';
 
 export const metadata = {
   title: 'Admin – Material',
@@ -107,7 +108,7 @@ export default async function AdminMaterialsPage({
                   <td className="px-3 py-2 text-sm text-slate-800">{m.name}</td>
                   <td className="px-3 py-2 text-right text-xs">
                     <div className="inline-flex items-center gap-2">
-                      <form action={upsertMaterial} className="inline-flex gap-2">
+                      <AdminForm action={upsertMaterial} className="inline-flex gap-2" toastMessage="Sparat" pendingMessage="Sparar…">
                         <input type="hidden" name="id" value={m.id} />
                         <input
                           type="text"
@@ -121,9 +122,9 @@ export default async function AdminMaterialsPage({
                         >
                           Spara
                         </button>
-                      </form>
+                      </AdminForm>
 
-                      <form action={deleteMaterial}>
+                      <AdminForm action={deleteMaterial} toastMessage={undefined} pendingMessage="Tar bort…" showOverlay>
                         <input type="hidden" name="id" value={m.id} />
                         <button
                           type="submit"
@@ -131,7 +132,7 @@ export default async function AdminMaterialsPage({
                         >
                           Ta bort
                         </button>
-                      </form>
+                      </AdminForm>
                     </div>
                   </td>
                 </tr>
@@ -143,7 +144,7 @@ export default async function AdminMaterialsPage({
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Nytt material
           </h2>
-          <form action={upsertMaterial} className="space-y-3">
+          <AdminForm action={upsertMaterial} className="space-y-3" toastMessage="Skapat" pendingMessage="Skapar…">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Namn
@@ -161,7 +162,7 @@ export default async function AdminMaterialsPage({
             >
               Skapa material
             </button>
-          </form>
+          </AdminForm>
         </div>
       </div>
     </div>

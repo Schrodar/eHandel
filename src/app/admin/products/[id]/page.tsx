@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Fragment } from 'react';
+import AdminForm from '@/components/admin/AdminForm';
 import {
   createVariant,
   publishProduct,
@@ -127,7 +128,7 @@ export default async function AdminProductDetailPage({
             Preview
           </Link>
           {product.published ? (
-            <form action={unpublishProduct}>
+            <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={true}>
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
@@ -135,9 +136,9 @@ export default async function AdminProductDetailPage({
               >
                 Unpublish
               </button>
-            </form>
+            </AdminForm>
           ) : (
-            <form action={publishProduct}>
+            <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={true}>
               <input type="hidden" name="id" value={product.id} />
               <button
                 type="submit"
@@ -145,7 +146,7 @@ export default async function AdminProductDetailPage({
               >
                 Publish
               </button>
-            </form>
+            </AdminForm>
           )}
         </div>
       </div>
@@ -226,10 +227,12 @@ export default async function AdminProductDetailPage({
             </div>
           )}
 
-          <form
+          <AdminForm
             id="product-update-form"
             action={updateProduct}
             className="space-y-6 rounded-xl border border-slate-200 bg-white p-4 text-sm md:p-6"
+            toastMessage="Sparat"
+            pendingMessage="Sparar…"
           >
             <input type="hidden" name="id" value={product.id} />
             <input
@@ -422,11 +425,11 @@ export default async function AdminProductDetailPage({
             </ul>
           </section>
 
-          </form>
+          </AdminForm>
 
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             {product.published ? (
-              <form action={unpublishProduct}>
+              <AdminForm action={unpublishProduct} toastMessage="Avpublicerad" pendingMessage="Avpublicerar…" showOverlay={true}>
                 <input type="hidden" name="id" value={product.id} />
                 <button
                   type="submit"
@@ -434,9 +437,9 @@ export default async function AdminProductDetailPage({
                 >
                   Unpublish
                 </button>
-              </form>
+              </AdminForm>
             ) : (
-              <form action={publishProduct}>
+              <AdminForm action={publishProduct} toastMessage="Publicerad" pendingMessage="Publicerar…" showOverlay={true}>
                 <input type="hidden" name="id" value={product.id} />
                 <button
                   type="submit"
@@ -444,7 +447,7 @@ export default async function AdminProductDetailPage({
                 >
                   Publish
                 </button>
-              </form>
+              </AdminForm>
             )}
 
             <button
@@ -625,7 +628,7 @@ export default async function AdminProductDetailPage({
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-2">
-                          <form action={toggleVariantActive}>
+                          <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={true}>
                             <input type="hidden" name="id" value={v.id} />
                             <input
                               type="hidden"
@@ -642,7 +645,7 @@ export default async function AdminProductDetailPage({
                             >
                               {v.active ? 'Deactivate' : 'Activate'}
                             </button>
-                          </form>
+                          </AdminForm>
 
                           {isEditing ? (
                             <Link
@@ -663,7 +666,7 @@ export default async function AdminProductDetailPage({
 
                         {isEditing && (
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <form action={updateVariant} className="grid gap-3 md:grid-cols-3">
+                            <AdminForm action={updateVariant} className="grid gap-3 md:grid-cols-3" toastMessage="Sparat" pendingMessage="Sparar…" showOverlay={true}>
                               <input type="hidden" name="id" value={v.id} />
                               <input
                                 type="hidden"
@@ -771,7 +774,7 @@ export default async function AdminProductDetailPage({
                                   Spara variant
                                 </button>
                               </div>
-                            </form>
+                            </AdminForm>
                           </div>
                         )}
                       </div>
@@ -877,7 +880,7 @@ export default async function AdminProductDetailPage({
                             </div>
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <form action={toggleVariantActive}>
+                            <AdminForm action={toggleVariantActive} toastMessage="Uppdaterat" pendingMessage="Uppdaterar…" showOverlay={true}>
                               <input type="hidden" name="id" value={v.id} />
                               <input
                                 type="hidden"
@@ -894,7 +897,7 @@ export default async function AdminProductDetailPage({
                               >
                                 {v.active ? 'Deactivate' : 'Activate'}
                               </button>
-                            </form>
+                            </AdminForm>
                           </td>
                           <td className="px-3 py-2 text-right">
                             {isEditing ? (

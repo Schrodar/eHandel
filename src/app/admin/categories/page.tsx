@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import AdminForm from '@/components/admin/AdminForm';
 
 export const metadata = {
   title: 'Admin – Kategorier',
@@ -107,7 +108,7 @@ export default async function AdminCategoriesPage({
                   <td className="px-3 py-2 text-sm text-slate-800">{c.name}</td>
                   <td className="px-3 py-2 text-right text-xs">
                     <div className="inline-flex items-center gap-2">
-                      <form action={upsertCategory} className="inline-flex gap-2">
+                      <AdminForm action={upsertCategory} className="inline-flex gap-2" toastMessage="Sparat" pendingMessage="Sparar…">
                         <input type="hidden" name="id" value={c.id} />
                         <input
                           type="text"
@@ -121,9 +122,9 @@ export default async function AdminCategoriesPage({
                         >
                           Spara
                         </button>
-                      </form>
+                      </AdminForm>
 
-                      <form action={deleteCategory}>
+                      <AdminForm action={deleteCategory} toastMessage={undefined} pendingMessage="Tar bort…" showOverlay>
                         <input type="hidden" name="id" value={c.id} />
                         <button
                           type="submit"
@@ -131,7 +132,7 @@ export default async function AdminCategoriesPage({
                         >
                           Ta bort
                         </button>
-                      </form>
+                      </AdminForm>
                     </div>
                   </td>
                 </tr>
@@ -143,7 +144,7 @@ export default async function AdminCategoriesPage({
           <h2 className="mb-3 text-sm font-semibold text-slate-900">
             Ny kategori
           </h2>
-          <form action={upsertCategory} className="space-y-3">
+          <AdminForm action={upsertCategory} className="space-y-3" toastMessage="Skapad" pendingMessage="Skapar…">
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Namn
@@ -161,7 +162,7 @@ export default async function AdminCategoriesPage({
             >
               Skapa kategori
             </button>
-          </form>
+          </AdminForm>
         </div>
       </div>
     </div>

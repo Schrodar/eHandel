@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
+import AdminForm from '@/components/admin/AdminForm';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -144,7 +145,7 @@ function MobileProductListAccordion({
                 >
                   Preview
                 </Link>
-                <form action={deleteProduct}>
+                <AdminForm action={deleteProduct} toastMessage={undefined} pendingMessage="Tar bort…" showOverlay>
                   <input type="hidden" name="id" value={p.id} />
                   <button
                     type="submit"
@@ -152,7 +153,7 @@ function MobileProductListAccordion({
                   >
                     Delete
                   </button>
-                </form>
+                </AdminForm>
               </div>
             </div>
           </details>
