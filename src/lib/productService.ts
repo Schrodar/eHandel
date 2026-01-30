@@ -81,7 +81,7 @@ function mapDbProductToWardrobe(product: DbProductWithRelations): WardrobeProduc
   return {
     id: product.id,
     name: product.name,
-    category: product.category?.id ?? 'other',
+    category: product.category?.name ?? 'Annat',
     style: (jsonObjectOrNull(product.attributes as unknown)?.style as string) ?? 'minimal',
     fit: (jsonObjectOrNull(product.attributes as unknown)?.fit as string) ?? 'regular',
     material: product.material?.name ?? 'cotton',
