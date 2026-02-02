@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useCart } from '../hooks/useCart';
 import { CartDrawer } from '@/components/CartDrawer';
 import { CheckoutModal } from '@/components/CheckoutModal';
@@ -22,6 +22,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const cart = useCart();
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function openCart() {
     setCartOpen(true);
@@ -62,19 +67,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   return (
     <CartContext.Provider value={value}>
       {children}
-      <CartDrawer
-        open={cartOpen}
-        onClose={closeCart}
-        items={cart.items}
-        setQty={cart.setQty}
-        onCheckout={openCheckout}
-      />
+      {mounted && (
+        <CartDrawer
+          open={cartOpen}
+          onClose={closeCart}
+          items={cart.items}
+          setQty={cart.setQty}
+          onCheckout={openCheckout}
+        />
+      )}
 
-      <CheckoutModal
-        open={checkoutOpen}
-        onClose={closeCheckout}
-        onSubmit={finishOrder}
-      />
+      {mounted && (
+        <CheckoutModal
+          open={checkoutOpen}
+          onClose={closeCheckout}
+          onSubmit={finishOrder}
+        />
+      )}
     </CartContext.Provider>
   );
 }

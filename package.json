@@ -10,14 +10,17 @@
     "start": "next start",
     "migrate:dev": "prisma migrate dev --name add-orders",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.1",
     "framer-motion": "^12.26.2",
     "next": "16.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-qr-code": "^2.0.18"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

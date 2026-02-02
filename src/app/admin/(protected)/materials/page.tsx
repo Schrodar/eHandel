@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import AdminForm from '@/components/admin/AdminForm';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 export const metadata = {
   title: 'Admin – Material',
@@ -9,6 +10,8 @@ export const metadata = {
 
 async function upsertMaterial(formData: FormData) {
   'use server';
+
+  await requireAdminSession();
 
   const id = ((formData.get('id') as string | null) || '').trim();
   const name = ((formData.get('name') as string | null) || '').trim();
@@ -28,12 +31,16 @@ async function upsertMaterial(formData: FormData) {
 async function deleteMaterial(formData: FormData) {
   'use server';
 
+  await requireAdminSession();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   if (!id) redirect('/admin/materials?error=missing-id');
 
   const inUseCount = await prisma.product.count({ where: { materialId: id } });
   if (inUseCount > 0) {
-    redirect(`/admin/materials?error=in-use&id=${encodeURIComponent(id)}&count=${inUseCount}`);
+    redirect(
+      `/admin/materials?error=in-use&id=${encodeURIComponent(id)}&count=${inUseCount}`,
+    );
   }
 
   await prisma.material.delete({ where: { id } });
@@ -98,17 +105,18 @@ export default async function AdminMaterialsPage({
             </thead>
             <tbody>
               {materials.map((m) => (
-                <tr
-                  key={m.id}
-                  className="border-b border-slate-100 last:border-0"
-                >
-                  <td className="px-3 py-2 font-mono text-xs text-slate-500">
-                    {m.id}
-                  </td>
+                <tr key={m.id} className="border-b border-slate-100 last:border-0">
+                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{m.id}</td>
                   <td className="px-3 py-2 text-sm text-slate-800">{m.name}</td>
                   <td className="px-3 py-2 text-right text-xs">
                     <div className="inline-flex items-center gap-2">
-                      <AdminForm action={upsertMaterial} className="inline-flex gap-2" toastMessage="Sparat" pendingMessage="Sparar…" showOverlay={false}>
+                      <AdminForm
+                        action={upsertMaterial}
+                        className="inline-flex gap-2"
+                        toastMessage="Sparat"
+                        pendingMessage="Sparar…"
+                        showOverlay={false}
+                      >
                         <input type="hidden" name="id" value={m.id} />
                         <input
                           type="text"
@@ -124,7 +132,12 @@ export default async function AdminMaterialsPage({
                         </button>
                       </AdminForm>
 
-                      <AdminForm action={deleteMaterial} toastMessage={undefined} pendingMessage="Tar bort…" showOverlay>
+                      <AdminForm
+                        action={deleteMaterial}
+                        toastMessage={undefined}
+                        pendingMessage="Tar bort…"
+                        showOverlay
+                      >
                         <input type="hidden" name="id" value={m.id} />
                         <button
                           type="submit"
@@ -141,10 +154,14 @@ export default async function AdminMaterialsPage({
           </table>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">
-            Nytt material
-          </h2>
-          <AdminForm action={upsertMaterial} className="space-y-3" toastMessage="Skapat" pendingMessage="Skapar…" showOverlay={false}>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Nytt material</h2>
+          <AdminForm
+            action={upsertMaterial}
+            className="space-y-3"
+            toastMessage="Skapat"
+            pendingMessage="Skapar…"
+            showOverlay={false}
+          >
             <div>
               <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                 Namn

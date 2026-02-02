@@ -98,7 +98,10 @@ async function getKpis() {
       productId: row.productId,
       minStock: row._min?.stock ?? null,
     }))
-    .filter((row) => (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD)
+    .filter(
+      (row) =>
+        (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD,
+    )
     .map((row) => ({
       productId: row.productId,
       minStock: row.minStock ?? 0,
@@ -112,7 +115,9 @@ async function getKpis() {
           where: { id: { in: lowStockProductIds } },
           select: { id: true, name: true },
         });
-  const nameById = new Map(lowStockProductNames.map((p) => [p.id, p.name] as const));
+  const nameById = new Map(
+    lowStockProductNames.map((p) => [p.id, p.name] as const),
+  );
 
   const lowStockProducts: {
     productId: string;
@@ -191,8 +196,13 @@ async function getKpis() {
 }
 
 export default async function AdminDashboardPage() {
-  const { publishedCount, draftCount, lowStockCount, lowStockProducts, issues } =
-    await getKpis();
+  const {
+    publishedCount,
+    draftCount,
+    lowStockCount,
+    lowStockProducts,
+    issues,
+  } = await getKpis();
 
   return (
     <div className="space-y-8">
@@ -319,14 +329,16 @@ export default async function AdminDashboardPage() {
 
       <section aria-label="Låg lagernivå" className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">
-            Låg lagernivå
-          </h2>
-          <div className="text-xs text-slate-500">Tröskel: min aktiv variant &lt; 3</div>
+          <h2 className="text-sm font-semibold text-slate-900">Låg lagernivå</h2>
+          <div className="text-xs text-slate-500">
+            Tröskel: min aktiv variant &lt; 3
+          </div>
         </div>
 
         {lowStockProducts.length === 0 ? (
-          <p className="text-xs text-slate-600">Inga produkter har låg lagernivå.</p>
+          <p className="text-xs text-slate-600">
+            Inga produkter har låg lagernivå.
+          </p>
         ) : (
           <ul className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white text-sm">
             {lowStockProducts

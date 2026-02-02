@@ -4,6 +4,12 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { requireAdminSession } from '@/lib/adminAuth';
+
+async function assertAdmin() {
+  // Server actions should be protected even if the UI is protected.
+  await requireAdminSession();
+}
 
 function slugify(value: string): string {
   return value
@@ -90,22 +96,19 @@ function parseImagesText(value: string): string[] {
 }
 
 export async function createProduct(formData: FormData) {
+  await assertAdmin();
+
   const errors: Record<string, string> = {};
 
   const name = ((formData.get('name') as string | null) || '').trim();
   const rawSlug = ((formData.get('slug') as string | null) || '').trim();
   const description =
     ((formData.get('description') as string | null) || '').trim() || null;
-  const categoryId = (
-    (formData.get('categoryId') as string | null) || ''
-  ).trim();
-  const materialId = (
-    (formData.get('materialId') as string | null) || ''
-  ).trim();
+  const categoryId = ((formData.get('categoryId') as string | null) || '').trim();
+  const materialId = ((formData.get('materialId') as string | null) || '').trim();
   const priceClass =
     ((formData.get('priceClass') as string | null) || '').trim() || 'standard';
-  const season =
-    ((formData.get('season') as string | null) || '').trim() || 'all';
+  const season = ((formData.get('season') as string | null) || '').trim() || 'all';
   const canonicalImage =
     ((formData.get('canonicalImage') as string | null) || '').trim() || null;
   // Publishing is handled via the explicit Publish action, after variants exist.
@@ -168,6 +171,8 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   if (!id) {
     redirect('/admin/products?error=missing-id');
@@ -179,16 +184,11 @@ export async function updateProduct(formData: FormData) {
   const rawSlug = ((formData.get('slug') as string | null) || '').trim();
   const description =
     ((formData.get('description') as string | null) || '').trim() || null;
-  const categoryId = (
-    (formData.get('categoryId') as string | null) || ''
-  ).trim();
-  const materialId = (
-    (formData.get('materialId') as string | null) || ''
-  ).trim();
+  const categoryId = ((formData.get('categoryId') as string | null) || '').trim();
+  const materialId = ((formData.get('materialId') as string | null) || '').trim();
   const priceClass =
     ((formData.get('priceClass') as string | null) || '').trim() || 'standard';
-  const season =
-    ((formData.get('season') as string | null) || '').trim() || 'all';
+  const season = ((formData.get('season') as string | null) || '').trim() || 'all';
   const canonicalImage =
     ((formData.get('canonicalImage') as string | null) || '').trim() || null;
   const priceSekRaw = (formData.get('priceSek') as string | null) ?? null;
@@ -243,6 +243,8 @@ export async function updateProduct(formData: FormData) {
 }
 
 export async function publishProduct(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   if (!id) redirect('/admin/products?error=missing-id');
 
@@ -260,7 +262,8 @@ export async function publishProduct(formData: FormData) {
   const hasReadyVariants =
     activeVariants.length > 0 &&
     activeVariants.every((v) => {
-      const hasEffectiveImages = Boolean(v.images) || Boolean(product.canonicalImage);
+      const hasEffectiveImages =
+        Boolean(v.images) || Boolean(product.canonicalImage);
       const hasEffectivePrice = (v.priceInCents ?? basePriceInCents) != null;
       return v.sku && v.stock >= 0 && hasEffectiveImages && hasEffectivePrice;
     });
@@ -283,6 +286,8 @@ export async function publishProduct(formData: FormData) {
 }
 
 export async function unpublishProduct(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   if (!id) redirect('/admin/products?error=missing-id');
 
@@ -300,6 +305,8 @@ export async function unpublishProduct(formData: FormData) {
 }
 
 export async function deleteProduct(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   if (!id) redirect('/admin/products?error=missing-id');
 
@@ -313,18 +320,18 @@ export async function deleteProduct(formData: FormData) {
 }
 
 export async function createVariant(formData: FormData) {
+  await assertAdmin();
+
   const productId = ((formData.get('productId') as string | null) || '').trim();
   if (!productId) redirect('/admin/products?error=missing-product');
 
   const errors: Record<string, string> = {};
 
   const skuRaw = ((formData.get('sku') as string | null) || '').trim();
-  const colorId =
-    ((formData.get('colorId') as string | null) || '').trim() || null;
+  const colorId = ((formData.get('colorId') as string | null) || '').trim() || null;
   const stockRaw = (formData.get('stock') as string | null) ?? '0';
   const active = parseBooleanField(formData.get('active'));
-  const priceOverrideSekRaw =
-    (formData.get('priceOverrideSek') as string | null) ?? null;
+  const priceOverrideSekRaw = (formData.get('priceOverrideSek') as string | null) ?? null;
   const imagesText = ((formData.get('imagesText') as string | null) || '').trim();
   const imagesJson = ((formData.get('imagesJson') as string | null) || '').trim();
 
@@ -341,15 +348,10 @@ export async function createVariant(formData: FormData) {
 
   let priceInCents: number | null = null;
   if (priceOverrideSekRaw && priceOverrideSekRaw.trim()) {
-    priceInCents = parsePriceSek(
-      priceOverrideSekRaw,
-      errors,
-      'priceOverrideSek',
-    );
+    priceInCents = parsePriceSek(priceOverrideSekRaw, errors, 'priceOverrideSek');
   }
 
-  let images: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null =
-    null;
+  let images: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null = null;
   if (imagesText) {
     const parsed = parseImagesText(imagesText);
     if (parsed.length === 0) {
@@ -360,18 +362,13 @@ export async function createVariant(formData: FormData) {
   } else if (imagesJson) {
     try {
       const parsed = JSON.parse(imagesJson);
-      if (
-        Array.isArray(parsed) &&
-        parsed.every((v) => typeof v === 'string' && v.trim())
-      ) {
+      if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string' && v.trim())) {
         images = parsed;
       } else {
-        errors.imagesJson =
-          'Images måste vara en JSON-array med strängar (t.ex. ["/img1.jpg"])';
+        errors.imagesJson = 'Images måste vara en JSON-array med strängar (t.ex. ["/img1.jpg"])';
       }
     } catch {
-      errors.imagesJson =
-        'Images måste vara giltig JSON (t.ex. ["/img1.jpg"])';
+      errors.imagesJson = 'Images måste vara giltig JSON (t.ex. ["/img1.jpg"])';
     }
   }
 
@@ -391,9 +388,7 @@ export async function createVariant(formData: FormData) {
   }
 
   if (Object.keys(errors).length > 0) {
-    redirect(
-      `/admin/products/${productId}?tab=variants&error=variant-validation`,
-    );
+    redirect(`/admin/products/${productId}?tab=variants&error=variant-validation`);
   }
 
   let sku = skuRaw;
@@ -440,6 +435,8 @@ export async function createVariant(formData: FormData) {
 }
 
 export async function updateVariant(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   const productId = ((formData.get('productId') as string | null) || '').trim();
   if (!id || !productId) redirect('/admin/products?error=missing-variant');
@@ -447,12 +444,10 @@ export async function updateVariant(formData: FormData) {
   const errors: Record<string, string> = {};
 
   const sku = ((formData.get('sku') as string | null) || '').trim();
-  const colorId =
-    ((formData.get('colorId') as string | null) || '').trim() || null;
+  const colorId = ((formData.get('colorId') as string | null) || '').trim() || null;
   const stockRaw = (formData.get('stock') as string | null) ?? '0';
   const active = parseBooleanField(formData.get('active'));
-  const priceOverrideSekRaw =
-    (formData.get('priceOverrideSek') as string | null) ?? null;
+  const priceOverrideSekRaw = (formData.get('priceOverrideSek') as string | null) ?? null;
   const imagesText = ((formData.get('imagesText') as string | null) || '').trim();
   const imagesJson = ((formData.get('imagesJson') as string | null) || '').trim();
 
@@ -467,11 +462,7 @@ export async function updateVariant(formData: FormData) {
 
   let priceInCents: number | null = null;
   if (priceOverrideSekRaw && priceOverrideSekRaw.trim()) {
-    priceInCents = parsePriceSek(
-      priceOverrideSekRaw,
-      errors,
-      'priceOverrideSek',
-    );
+    priceInCents = parsePriceSek(priceOverrideSekRaw, errors, 'priceOverrideSek');
   }
 
   const product = await prisma.product.findUnique({
@@ -480,8 +471,7 @@ export async function updateVariant(formData: FormData) {
   });
   if (!product) redirect('/admin/products?error=missing-product');
 
-  let images: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null =
-    null;
+  let images: Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput | null = null;
   if (imagesText) {
     const parsed = parseImagesText(imagesText);
     if (parsed.length === 0) {
@@ -492,18 +482,13 @@ export async function updateVariant(formData: FormData) {
   } else if (imagesJson) {
     try {
       const parsed = JSON.parse(imagesJson);
-      if (
-        Array.isArray(parsed) &&
-        parsed.every((v) => typeof v === 'string' && v.trim())
-      ) {
+      if (Array.isArray(parsed) && parsed.every((v) => typeof v === 'string' && v.trim())) {
         images = parsed;
       } else {
-        errors.imagesJson =
-          'Images måste vara en JSON-array med strängar (t.ex. ["/img1.jpg"])';
+        errors.imagesJson = 'Images måste vara en JSON-array med strängar (t.ex. ["/img1.jpg"])';
       }
     } catch {
-      errors.imagesJson =
-        'Images måste vara giltig JSON (t.ex. ["/img1.jpg"])';
+      errors.imagesJson = 'Images måste vara giltig JSON (t.ex. ["/img1.jpg"])';
     }
   }
 
@@ -523,9 +508,7 @@ export async function updateVariant(formData: FormData) {
   }
 
   if (Object.keys(errors).length > 0) {
-    redirect(
-      `/admin/products/${productId}?tab=variants&error=variant-validation`,
-    );
+    redirect(`/admin/products/${productId}?tab=variants&error=variant-validation`);
   }
 
   const existingSku = await prisma.productVariant.findUnique({
@@ -543,8 +526,7 @@ export async function updateVariant(formData: FormData) {
       stock,
       priceInCents: priceInCents ?? undefined,
       // If empty, we clear images to allow inheriting product fallback images.
-      images:
-        imagesText || imagesJson ? (images ?? Prisma.DbNull) : Prisma.DbNull,
+      images: imagesText || imagesJson ? (images ?? Prisma.DbNull) : Prisma.DbNull,
       active,
     },
   });
@@ -557,6 +539,8 @@ export async function updateVariant(formData: FormData) {
 }
 
 export async function toggleVariantActive(formData: FormData) {
+  await assertAdmin();
+
   const id = ((formData.get('id') as string | null) || '').trim();
   const productId = ((formData.get('productId') as string | null) || '').trim();
   if (!id || !productId) redirect('/admin/products?error=missing-variant');
@@ -579,14 +563,10 @@ export async function toggleVariantActive(formData: FormData) {
       redirect(`/admin/products/${productId}?tab=variants&error=sku-missing`);
     }
     if (variant.stock < 0) {
-      redirect(
-        `/admin/products/${productId}?tab=variants&error=stock-negative`,
-      );
+      redirect(`/admin/products/${productId}?tab=variants&error=stock-negative`);
     }
     if (!variant.images && !product.canonicalImage) {
-      redirect(
-        `/admin/products/${productId}?tab=variants&error=images-missing`,
-      );
+      redirect(`/admin/products/${productId}?tab=variants&error=images-missing`);
     }
     if ((variant.priceInCents ?? product.priceInCents) == null) {
       redirect(`/admin/products/${productId}?tab=variants&error=price-missing`);

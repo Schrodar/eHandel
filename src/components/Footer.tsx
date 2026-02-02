@@ -2,8 +2,15 @@
 
 import Link from 'next/link';
 import { siteConfig } from '@/lib/siteConfig';
+import { useEffect, useState } from 'react';
 
 export function Footer() {
+  const [year, setYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   return (
     <footer className="w-full bg-[#e9aeb7] pt-16 pb-10 mt-auto">
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
@@ -71,7 +78,11 @@ export function Footer() {
 
           {/* Bottom row */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/60">
-            <p>© {new Date().getFullYear()} {siteConfig.company.name}. All rights reserved.</p>
+            <p>
+              ©{' '}
+              <span suppressHydrationWarning>{year ?? ''}</span>{' '}
+              {siteConfig.company.name}. All rights reserved.
+            </p>
             <p>Built in Sweden · Fast delivery · Premium feel</p>
           </div>
         </div>

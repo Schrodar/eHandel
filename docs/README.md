@@ -32,6 +32,11 @@ npm run dev
 
 Se filerna i `docs/` för visuella översikter över mappstruktur och hur komponenterna kommunicerar.
 
+## Säkerhet
+
+- Admin security (Supabase Auth + MFA + allowlist): `docs/ADMIN_SECURITY.md`
+- Supabase RLS SQL (kör i Supabase SQL editor): `docs/SUPABASE_RLS.sql`
+
 ## Viktiga filer och förklaringar
 
 - `src/app/layout.tsx` — Huvudlayout för appen; renderar global struktur (t.ex. `TopNav`).

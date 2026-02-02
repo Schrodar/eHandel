@@ -2,6 +2,9 @@
 import type { Metadata } from 'next';
 import { TopNav } from '../components/TopNav';
 import { HeroSection } from '../components/HeroSection';
+import { PrefetchShopOnIdle } from '@/components/PrefetchShopOnIdle';
+import { Suspense } from 'react';
+import { AdminLoginEntry } from '@/components/admin/AdminLoginEntry';
 
 export const metadata: Metadata = {
   title: 'SAZZE — Essential Tees & Wardrobe',
@@ -15,6 +18,14 @@ export default function Page() {
       <TopNav />
 
       <HeroSection />
+
+      {/* Client island: prefetch /shop + preconnect to image hosts when idle */}
+      <PrefetchShopOnIdle />
+
+      {/* Client island: admin login button + modal */}
+      <Suspense fallback={null}>
+        <AdminLoginEntry />
+      </Suspense>
     </div>
   );
 }
