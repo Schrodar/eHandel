@@ -6,7 +6,7 @@
     "dev": "next dev",
     "devv": "next dev",
     "dev:clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true});\"",
-    "build": "next build",
+    "build": "node scripts/netlify-prisma-generate.mjs && next build",
     "start": "next start",
     "migrate:dev": "prisma migrate dev --name add-orders",
     "lint": "eslint",

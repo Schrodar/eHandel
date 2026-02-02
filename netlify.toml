@@ -1,0 +1,15 @@
+[build]
+  command = "npm run build"
+
+# Prisma query engine binaries must be included in Netlify function bundles.
+[functions]
+  included_files = [
+    "node_modules/.prisma/client/**",
+    "node_modules/@prisma/client/**",
+    "node_modules/@prisma/engines/**"
+  ]
+
+# Netlify secret scanning: Supabase anon key is a publishable client key.
+# We intentionally ship it to the browser, so omit it from the scan.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "NEXT_PUBLIC_SUPABASE_ANON_KEY"
