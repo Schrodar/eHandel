@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Season, WardrobeProduct } from '@/lib/wardrobeApi';
 import type { Prisma } from '@prisma/client';
+import { getPrimaryImage } from '@/lib/mediaPolicy';
 
 // Storefront types for product + variants
 export type StorefrontVariant = {
@@ -27,7 +28,6 @@ export type StorefrontProduct = {
   priceInCents: number; // base price in öre
   priceClass: string;
   season: string;
-  canonicalImage: string | null;
   // Flattened attributes from JSON for now
   attributes: Record<string, unknown> | null;
   variants: StorefrontVariant[];
@@ -37,7 +37,15 @@ type DbProductWithRelations = Prisma.ProductGetPayload<{
   include: {
     category: true;
     material: true;
-    variants: { include: { color: true } };
+    defaultVariant: {
+      include: { variantImages: { include: { asset: true } } };
+    };
+    variants: {
+      include: {
+        color: true;
+        variantImages: { include: { asset: true } };
+      };
+    };
   };
 }>;
 
@@ -66,26 +74,89 @@ function toSeason(value: unknown): Season {
   return SEASONS.has(normalized as Season) ? (normalized as Season) : 'all';
 }
 
-function mapDbProductToWardrobe(product: DbProductWithRelations): WardrobeProduct {
-  const firstVariant = product.variants?.[0];
-  const variantImages = jsonArrayOfStrings(firstVariant?.images as unknown);
-  const variantImage = variantImages[0];
+function resolveBasePriceInCents(product: DbProductWithRelations): number {
+  if (typeof product.priceInCents === 'number') return product.priceInCents;
 
-  const image: string =
-    product.canonicalImage || variantImage || '/product-w-001.svg';
+  const defaultPrice = product.defaultVariant?.priceInCents;
+  if (typeof defaultPrice === 'number') return defaultPrice;
 
-  const price = product.priceInCents
-    ? Math.round(product.priceInCents / 100)
-    : 0;
+  const activeVariant = product.variants.find(
+    (variant) => variant.active && typeof variant.priceInCents === 'number',
+  );
+  if (activeVariant?.priceInCents != null) return activeVariant.priceInCents;
+
+  const anyVariant = product.variants.find(
+    (variant) => typeof variant.priceInCents === 'number',
+  );
+  return anyVariant?.priceInCents ?? 0;
+}
+
+function getVariantImageUrls(
+  variant: DbProductWithRelations['variants'][number],
+): string[] {
+  if (!variant.variantImages?.length) return [];
+  return variant.variantImages
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((vi) => vi.asset?.url)
+    .filter((url): url is string => typeof url === 'string' && url.length > 0);
+}
+
+function mapDbProductToWardrobe(
+  product: DbProductWithRelations,
+): WardrobeProduct {
+  // Priority 1: defaultVariant primary image
+  let image = '';
+  if (product.defaultVariant) {
+    const primaryImage = getPrimaryImage(product.defaultVariant as any);
+    if (primaryImage?.url) {
+      image = primaryImage.url;
+    }
+  }
+
+  // Priority 2: first active variant primary image
+  if (!image) {
+    for (const variant of product.variants) {
+      if (variant.active) {
+        const primaryImage = getPrimaryImage(variant as any);
+        if (primaryImage?.url) {
+          image = primaryImage.url;
+          break;
+        }
+      }
+    }
+  }
+
+  // Priority 3: first variant primary image
+  if (!image) {
+    const firstVariant = product.variants?.[0];
+    if (firstVariant) {
+      const primaryImage = getPrimaryImage(firstVariant as any);
+      if (primaryImage?.url) {
+        image = primaryImage.url;
+      }
+    }
+  }
+
+  // Fallback
+  if (!image) {
+    image = '/product-w-001.svg';
+  }
+
+  const price = Math.round(resolveBasePriceInCents(product) / 100);
 
   return {
     id: product.id,
     name: product.name,
     category: product.category?.name ?? 'Annat',
-    style: (jsonObjectOrNull(product.attributes as unknown)?.style as string) ?? 'minimal',
-    fit: (jsonObjectOrNull(product.attributes as unknown)?.fit as string) ?? 'regular',
+    style:
+      (jsonObjectOrNull(product.attributes as unknown)?.style as string) ??
+      'minimal',
+    fit:
+      (jsonObjectOrNull(product.attributes as unknown)?.fit as string) ??
+      'regular',
     material: product.material?.name ?? 'cotton',
-    color: firstVariant?.color?.name ?? 'white',
+    color: product.variants?.[0]?.color?.name ?? 'white',
     season: toSeason(product.season),
     price,
     priceClass: (product.priceClass ||
@@ -94,13 +165,15 @@ function mapDbProductToWardrobe(product: DbProductWithRelations): WardrobeProduc
   };
 }
 
-function mapDbProductToStorefront(product: DbProductWithRelations): StorefrontProduct {
-  const basePriceInCents: number = product.priceInCents ?? 0;
+function mapDbProductToStorefront(
+  product: DbProductWithRelations,
+): StorefrontProduct {
+  const basePriceInCents = resolveBasePriceInCents(product);
 
   const variants: StorefrontVariant[] = (product.variants ?? [])
     .filter((v) => v && v.active)
     .map((v) => {
-      const images = jsonArrayOfStrings(v.images as unknown);
+      const images = getVariantImageUrls(v);
 
       const priceInCents: number =
         typeof v.priceInCents === 'number' && Number.isInteger(v.priceInCents)
@@ -116,7 +189,9 @@ function mapDbProductToStorefront(product: DbProductWithRelations): StorefrontPr
         images,
         priceInCents,
         stock:
-          typeof v.stock === 'number' && Number.isInteger(v.stock) && v.stock >= 0
+          typeof v.stock === 'number' &&
+          Number.isInteger(v.stock) &&
+          v.stock >= 0
             ? v.stock
             : 0,
         active: Boolean(v.active),
@@ -135,7 +210,6 @@ function mapDbProductToStorefront(product: DbProductWithRelations): StorefrontPr
     priceInCents: basePriceInCents,
     priceClass: product.priceClass ?? 'standard',
     season: product.season ?? 'all',
-    canonicalImage: product.canonicalImage ?? null,
     attributes: jsonObjectOrNull(product.attributes as unknown),
     variants,
   } satisfies StorefrontProduct;
@@ -149,9 +223,14 @@ export async function getAllWardrobeProductsFromDb(): Promise<
     include: {
       category: true,
       material: true,
+      defaultVariant: {
+        include: { variantImages: { include: { asset: true } } },
+      },
       variants: {
-        where: { active: true },
-        include: { color: true },
+        include: {
+          color: true,
+          variantImages: { include: { asset: true } },
+        },
         orderBy: { sku: 'asc' },
       },
     },
@@ -173,9 +252,14 @@ export async function getWardrobeProductByIdOrSlug(
     include: {
       category: true,
       material: true,
+      defaultVariant: {
+        include: { variantImages: { include: { asset: true } } },
+      },
       variants: {
-        where: { active: true },
-        include: { color: true },
+        include: {
+          color: true,
+          variantImages: { include: { asset: true } },
+        },
         orderBy: { sku: 'asc' },
       },
     },
@@ -198,9 +282,14 @@ export async function getStorefrontProductByIdOrSlug(
     include: {
       category: true,
       material: true,
+      defaultVariant: {
+        include: { variantImages: { include: { asset: true } } },
+      },
       variants: {
-        where: { active: true },
-        include: { color: true },
+        include: {
+          color: true,
+          variantImages: { include: { asset: true } },
+        },
         orderBy: { sku: 'asc' },
       },
     },

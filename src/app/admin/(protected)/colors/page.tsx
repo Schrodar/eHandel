@@ -53,7 +53,9 @@ async function deleteColor(formData: FormData) {
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
-function toStringParam(value: string | string[] | undefined): string | undefined {
+function toStringParam(
+  value: string | string[] | undefined,
+): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value ?? undefined;
 }
@@ -61,14 +63,15 @@ function toStringParam(value: string | string[] | undefined): string | undefined
 export default async function AdminColorsPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
   const colors = await prisma.color.findMany({ orderBy: { name: 'asc' } });
 
-  const error = toStringParam(searchParams?.error);
-  const deleted = toStringParam(searchParams?.deleted);
-  const errorId = toStringParam(searchParams?.id);
-  const errorCount = toStringParam(searchParams?.count);
+  const params = await searchParams;
+  const error = toStringParam(params?.error);
+  const deleted = toStringParam(params?.deleted);
+  const errorId = toStringParam(params?.id);
+  const errorCount = toStringParam(params?.count);
 
   return (
     <div className="space-y-6">
@@ -86,7 +89,8 @@ export default async function AdminColorsPage({
             <div>Färgen togs bort.</div>
           ) : error === 'in-use' ? (
             <div>
-              Kan inte ta bort färg{errorId ? ` "${errorId}"` : ''} eftersom den används av {errorCount ?? 'en eller flera'} varianter.
+              Kan inte ta bort färg{errorId ? ` "${errorId}"` : ''} eftersom den
+              används av {errorCount ?? 'en eller flera'} varianter.
             </div>
           ) : (
             <div>Något gick fel vid borttag.</div>
@@ -107,8 +111,13 @@ export default async function AdminColorsPage({
             </thead>
             <tbody>
               {colors.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{c.id}</td>
+                <tr
+                  key={c.id}
+                  className="border-b border-slate-100 last:border-0"
+                >
+                  <td className="px-3 py-2 font-mono text-xs text-slate-500">
+                    {c.id}
+                  </td>
                   <td className="px-3 py-2 text-sm text-slate-800">{c.name}</td>
                   <td className="px-3 py-2 text-sm text-slate-800">
                     <div className="flex items-center gap-2">
@@ -118,7 +127,9 @@ export default async function AdminColorsPage({
                           style={{ backgroundColor: c.hex }}
                         />
                       )}
-                      <span className="font-mono text-xs text-slate-700">{c.hex ?? '–'}</span>
+                      <span className="font-mono text-xs text-slate-700">
+                        {c.hex ?? '–'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right text-xs">

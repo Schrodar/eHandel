@@ -71,10 +71,16 @@ export async function POST(req: Request) {
     // Validate items shape
     for (const [i, it] of items.entries()) {
       if (!it || typeof it !== 'object')
-        return NextResponse.json({ error: `Invalid item at index ${i}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Invalid item at index ${i}` },
+          { status: 400 },
+        );
       const q = Number(it.quantity ?? 0);
       if (!Number.isInteger(q) || q < 1)
-        return NextResponse.json({ error: `Invalid quantity for item at index ${i}` }, { status: 400 });
+        return NextResponse.json(
+          { error: `Invalid quantity for item at index ${i}` },
+          { status: 400 },
+        );
     }
 
     // Collect variantIds and skus for batch fetch
@@ -100,7 +106,6 @@ export async function POST(req: Request) {
             name: true,
             slug: true,
             priceInCents: true,
-            canonicalImage: true,
             published: true,
           },
         },
@@ -111,15 +116,17 @@ export async function POST(req: Request) {
     });
 
     // Build lookup maps by id and sku
-    const byId = new Map<string, typeof variants[number]>();
-    const bySku = new Map<string, typeof variants[number]>();
+    const byId = new Map<string, (typeof variants)[number]>();
+    const bySku = new Map<string, (typeof variants)[number]>();
     for (const v of variants) {
       if (v.id) byId.set(v.id, v);
       if (v.sku) bySku.set(v.sku, v);
     }
 
     const siteUrl =
-      process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+      process.env.SITE_URL ||
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      'http://localhost:3000';
 
     const line_items: KlarnaLineItem[] = [];
     const warnings: WarningItem[] = [];
@@ -133,26 +140,43 @@ export async function POST(req: Request) {
 
       if (!variant) {
         return NextResponse.json(
-          { error: 'Variant not found', index, sku: it.sku ?? null, variantId: it.variantId ?? null },
+          {
+            error: 'Variant not found',
+            index,
+            sku: it.sku ?? null,
+            variantId: it.variantId ?? null,
+          },
           { status: 404 },
         );
       }
 
       // Defensive property checks
       if (variant.active === false) {
-        return NextResponse.json({ error: 'Variant inactive', variantId: variant.id }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Variant inactive', variantId: variant.id },
+          { status: 400 },
+        );
       }
 
       const product = variant.product;
       if (!product?.published) {
         // policy: reject unpublished products
-        return NextResponse.json({ error: 'Product not published', productId: product?.id }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Product not published', productId: product?.id },
+          { status: 400 },
+        );
       }
 
       const stock = variant.stock ?? null;
       if (stock !== null && stock < qty) {
         return NextResponse.json(
-          { error: 'OUT_OF_STOCK', variantId: variant.id, sku: variant.sku, available: stock, requested: qty },
+          {
+            error: 'OUT_OF_STOCK',
+            variantId: variant.id,
+            sku: variant.sku,
+            available: stock,
+            requested: qty,
+          },
           { status: 409 },
         );
       }
@@ -162,37 +186,62 @@ export async function POST(req: Request) {
       const unitPrice = variant.priceInCents ?? product.priceInCents;
       if (unitPrice == null) {
         return NextResponse.json(
-          { error: 'Price missing', variantId: variant.id, productId: product.id },
+          {
+            error: 'Price missing',
+            variantId: variant.id,
+            productId: product.id,
+          },
           { status: 400 },
         );
       }
       if (!Number.isInteger(unitPrice)) {
-        return NextResponse.json({ error: 'Invalid price in DB for variant', variantId: variant.id }, { status: 500 });
+        return NextResponse.json(
+          { error: 'Invalid price in DB for variant', variantId: variant.id },
+          { status: 500 },
+        );
       }
 
       const total_amount = unitPrice * qty;
       const total_tax_amount = calcTaxAmount(total_amount, DEFAULT_TAX_RATE_BP);
 
       // build image_url absolute
-      const rawImage = firstImageFromJson(variant.images as unknown) ?? product.canonicalImage;
+      const rawImage = firstImageFromJson(variant.images as unknown);
       const image_url = rawImage
         ? rawImage.startsWith('http')
           ? rawImage
           : new URL(rawImage, siteUrl).toString()
         : undefined;
 
-      const product_url = new URL(`/product/${product.slug}`, siteUrl).toString();
+      const product_url = new URL(
+        `/product/${product.slug}`,
+        siteUrl,
+      ).toString();
 
       const sku = variant.sku ?? null;
 
-      const name = product.name + (variant.color ? ' – ' + (variant.color.name ?? '') : '');
+      const name =
+        product.name +
+        (variant.color ? ' – ' + (variant.color.name ?? '') : '');
 
       // Merchant data snapshot
-      const merchant_data = JSON.stringify({ productId: product.id, variantId: variant.id, sku, slug: product.slug });
+      const merchant_data = JSON.stringify({
+        productId: product.id,
+        variantId: variant.id,
+        sku,
+        slug: product.slug,
+      });
 
       // Price change warning
-      if (typeof it.clientUnitPrice === 'number' && it.clientUnitPrice !== unitPrice) {
-        warnings.push({ code: 'PRICE_CHANGED', sku, oldUnitPrice: it.clientUnitPrice, newUnitPrice: unitPrice });
+      if (
+        typeof it.clientUnitPrice === 'number' &&
+        it.clientUnitPrice !== unitPrice
+      ) {
+        warnings.push({
+          code: 'PRICE_CHANGED',
+          sku,
+          oldUnitPrice: it.clientUnitPrice,
+          newUnitPrice: unitPrice,
+        });
       }
 
       line_items.push({
@@ -210,7 +259,10 @@ export async function POST(req: Request) {
     }
 
     const order_amount = line_items.reduce((s, li) => s + li.total_amount, 0);
-    const order_tax_amount = line_items.reduce((s, li) => s + li.total_tax_amount, 0);
+    const order_tax_amount = line_items.reduce(
+      (s, li) => s + li.total_tax_amount,
+      0,
+    );
 
     return NextResponse.json(
       {
@@ -225,6 +277,9 @@ export async function POST(req: Request) {
     );
   } catch (err) {
     console.error('Checkout error', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 },
+    );
   }
 }

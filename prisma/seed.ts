@@ -141,8 +141,6 @@ async function main() {
     );
 
     const description = pickString(p.description) ?? null;
-    const canonicalImage =
-      pickString(p.canonicalImage, p.canonical_image) ?? null;
 
     const priceInCents = pickNumber(p.priceInCents, p.price_in_cents) ?? 0;
 
@@ -165,7 +163,6 @@ async function main() {
         priceInCents,
         ...(priceClass ? { priceClass } : {}),
         ...(season ? { season } : {}),
-        canonicalImage,
         attributes,
         published,
       },
@@ -179,7 +176,6 @@ async function main() {
         priceInCents,
         ...(priceClass ? { priceClass } : {}),
         ...(season ? { season } : {}),
-        canonicalImage,
         attributes,
         published,
       },

@@ -11,15 +11,19 @@ type AdminLayoutProps = {
 
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
+  { href: '/admin/orders', label: 'Ordrar' },
   { href: '/admin/products', label: 'Produkter' },
   { href: '/admin/categories', label: 'Kategorier' },
   { href: '/admin/materials', label: 'Material' },
   { href: '/admin/colors', label: 'Färger' },
+  { href: '/admin/media', label: 'Bildgalleri' },
 ];
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminProtectedLayout({ children }: AdminLayoutProps) {
+export default async function AdminProtectedLayout({
+  children,
+}: AdminLayoutProps) {
   await requireAdminSession();
 
   return (

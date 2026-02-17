@@ -18,8 +18,8 @@ export default async function NewProductPage() {
         <div>
           <h1 className="text-2xl font-serif">Skapa produkt</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Grundinformation för en ny produkt. Pris/bild kan vara fallbacks och
-            är valfria.
+            Grundinformation för en ny produkt. Pris och bilder hanteras per
+            variant.
           </p>
         </div>
         <Link
@@ -139,48 +139,6 @@ export default async function NewProductPage() {
               </div>
             </div>
           </details>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-900">Pris</h2>
-          <div className="grid max-w-full gap-4 md:max-w-sm md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
-                Fallback price (SEK)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                name="priceSek"
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Valfritt. Om tomt krävs pris per aktiv variant.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-900">Media</h2>
-          <div className="grid max-w-full gap-4 md:max-w-xl">
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
-                Canonical image URL
-              </label>
-              <input
-                type="text"
-                name="canonicalImage"
-                placeholder="/images/produkt.jpg eller full URL"
-                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                Valfritt. Kan användas som fallback-bild för varianter utan egna
-                bilder.
-              </p>
-            </div>
-          </div>
         </section>
 
         <section className="space-y-3">

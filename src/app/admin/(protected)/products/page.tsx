@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
 import AdminForm from '@/components/admin/AdminForm';
+import { getProductCardImage } from '@/lib/productCardImage';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -39,18 +40,27 @@ type ProductRow = Prisma.ProductGetPayload<{
     name: true;
     slug: true;
     published: true;
-    canonicalImage: true;
-    priceInCents: true;
+    defaultVariantId: true;
     category: { select: { id: true; name: true } };
     material: { select: { id: true; name: true } };
     _count: { select: { variants: true } };
+    defaultVariant: {
+      select: { variantImages: { include: { asset: true } } };
+    };
+    variants: {
+      select: {
+        variantImages: {
+          include: { asset: true };
+          orderBy: { sortOrder: 'asc' };
+        };
+      };
+    };
   };
 }>;
 
 type VariantStats = {
   activeCount: number;
   minActiveStock: number | null;
-  activeMissingImagesCount: number;
 };
 
 function MobileProductListAccordion({
@@ -66,11 +76,7 @@ function MobileProductListAccordion({
         const stats = statsById[p.id];
         const activeCount = stats?.activeCount ?? 0;
         const minActiveStock = stats?.minActiveStock ?? null;
-        const hasActiveMissingImages = (stats?.activeMissingImagesCount ?? 0) > 0;
-        const hasProblem =
-          (p.published && !p.canonicalImage) ||
-          (p.published && activeCount === 0) ||
-          (!p.canonicalImage && hasActiveMissingImages);
+        const hasProblem = p.published && activeCount === 0;
 
         return (
           <details
@@ -134,15 +140,7 @@ function MobileProductListAccordion({
                     {p.id}
                   </dd>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                      Pris
-                    </dt>
-                    <dd className="mt-0.5 text-sm font-medium tabular-nums text-slate-900">
-                        {p.priceInCents != null ? `${Math.round(p.priceInCents / 100)} kr` : '—'}
-                    </dd>
-                  </div>
+                <div className="grid grid-cols-1 gap-3">
                   <div>
                     <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                       Varianter
@@ -173,7 +171,12 @@ function MobileProductListAccordion({
                 >
                   Preview
                 </Link>
-                <AdminForm action={deleteProduct} toastMessage={undefined} pendingMessage="Tar bort…" showOverlay>
+                <AdminForm
+                  action={deleteProduct}
+                  toastMessage={undefined}
+                  pendingMessage="Tar bort…"
+                  showOverlay
+                >
                   <input type="hidden" name="id" value={p.id} />
                   <button
                     type="submit"
@@ -194,18 +197,24 @@ function MobileProductListAccordion({
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
-  const q = toStringParam(searchParams?.q) ?? '';
-  const publishedFilter = toStringParam(searchParams?.published) ?? 'all';
-  const categoryId = toStringParam(searchParams?.categoryId) ?? '';
-  const materialId = toStringParam(searchParams?.materialId) ?? '';
-  const priceClass = toStringParam(searchParams?.priceClass) ?? '';
-  const season = toStringParam(searchParams?.season) ?? '';
-  const sort = toStringParam(searchParams?.sort) ?? 'name-asc';
+  const resolvedSearchParams = await searchParams;
+  const q = toStringParam(resolvedSearchParams?.q) ?? '';
+  const publishedFilter =
+    toStringParam(resolvedSearchParams?.published) ?? 'all';
+  const categoryId = toStringParam(resolvedSearchParams?.categoryId) ?? '';
+  const materialId = toStringParam(resolvedSearchParams?.materialId) ?? '';
+  const priceClass = toStringParam(resolvedSearchParams?.priceClass) ?? '';
+  const season = toStringParam(resolvedSearchParams?.season) ?? '';
+  const sort = toStringParam(resolvedSearchParams?.sort) ?? 'name-asc';
 
-  const requestedPage = Math.max(1, toIntParam(searchParams?.page, 1));
-  const pageSize = clamp(toIntParam(searchParams?.pageSize, 25), 10, 100);
+  const requestedPage = Math.max(1, toIntParam(resolvedSearchParams?.page, 1));
+  const pageSize = clamp(
+    toIntParam(resolvedSearchParams?.pageSize, 25),
+    10,
+    100,
+  );
 
   const where: Prisma.ProductWhereInput = {};
 
@@ -239,10 +248,6 @@ export default async function AdminProductsPage({
   let orderBy: Prisma.ProductOrderByWithRelationInput = { name: 'asc' };
   if (sort === 'name-desc') {
     orderBy = { name: 'desc' };
-  } else if (sort === 'price-asc') {
-    orderBy = { priceInCents: 'asc' };
-  } else if (sort === 'price-desc') {
-    orderBy = { priceInCents: 'desc' };
   }
   // "Senast ändrad" kräver timestamps i modellen och kan läggas till senare
 
@@ -267,11 +272,21 @@ export default async function AdminProductsPage({
         name: true,
         slug: true,
         published: true,
-        canonicalImage: true,
-        priceInCents: true,
+        defaultVariantId: true,
         category: { select: { id: true, name: true } },
         material: { select: { id: true, name: true } },
         _count: { select: { variants: true } },
+        defaultVariant: {
+          select: { variantImages: { include: { asset: true } } },
+        },
+        variants: {
+          select: {
+            variantImages: {
+              include: { asset: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
       },
       orderBy,
       skip,
@@ -294,34 +309,20 @@ export default async function AdminProductsPage({
 
   const productIds = products.map((p) => p.id);
 
-  const statsById: Record<string, VariantStats | undefined> = Object.create(null);
+  const statsById: Record<string, VariantStats | undefined> =
+    Object.create(null);
 
   if (productIds.length > 0) {
-    const [activeAgg, missingImagesAgg] = await prisma.$transaction([
-      prisma.productVariant.groupBy({
-        by: ['productId'],
-        where: {
-          productId: { in: productIds },
-          active: true,
-        },
-        orderBy: { productId: 'asc' },
-        _count: { productId: true },
-        _min: { stock: true },
-      }),
-      prisma.productVariant.groupBy({
-        by: ['productId'],
-        where: {
-          productId: { in: productIds },
-          active: true,
-          OR: [
-            { images: { equals: Prisma.DbNull } },
-            { images: { equals: Prisma.JsonNull } },
-          ],
-        },
-        orderBy: { productId: 'asc' },
-        _count: { productId: true },
-      }),
-    ]);
+    const activeAgg = await prisma.productVariant.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: productIds },
+        active: true,
+      },
+      orderBy: { productId: 'asc' },
+      _count: { productId: true },
+      _min: { stock: true },
+    });
 
     for (const row of activeAgg) {
       const activeCount =
@@ -335,29 +336,7 @@ export default async function AdminProductsPage({
       statsById[row.productId] = {
         activeCount,
         minActiveStock: row._min?.stock ?? null,
-        activeMissingImagesCount: 0,
       };
-    }
-
-    for (const row of missingImagesAgg) {
-      const missingCount =
-        row._count &&
-        typeof row._count === 'object' &&
-        'productId' in row._count &&
-        typeof (row._count as { productId?: unknown }).productId === 'number'
-          ? ((row._count as { productId: number }).productId ?? 0)
-          : 0;
-
-      const existing = statsById[row.productId];
-      if (existing) {
-        existing.activeMissingImagesCount = missingCount;
-      } else {
-        statsById[row.productId] = {
-          activeCount: 0,
-          minActiveStock: null,
-          activeMissingImagesCount: missingCount,
-        };
-      }
     }
   }
 
@@ -367,7 +346,8 @@ export default async function AdminProductsPage({
   const makeHref = (nextPage: number) => {
     const sp = new URLSearchParams();
     if (q) sp.set('q', q);
-    if (publishedFilter && publishedFilter !== 'all') sp.set('published', publishedFilter);
+    if (publishedFilter && publishedFilter !== 'all')
+      sp.set('published', publishedFilter);
     if (categoryId) sp.set('categoryId', categoryId);
     if (materialId) sp.set('materialId', materialId);
     if (priceClass) sp.set('priceClass', priceClass);
@@ -404,8 +384,8 @@ export default async function AdminProductsPage({
         </div>
       </header>
 
-    <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-4">
-      <input type="hidden" name="page" value="1" />
+      <form className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-4">
+        <input type="hidden" name="page" value="1" />
         <div className="md:col-span-2">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
             Sök
@@ -443,8 +423,6 @@ export default async function AdminProductsPage({
           >
             <option value="name-asc">Namn A–Ö</option>
             <option value="name-desc">Namn Ö–A</option>
-            <option value="price-asc">Pris lågt → högt</option>
-            <option value="price-desc">Pris högt → lågt</option>
           </select>
         </div>
 
@@ -538,127 +516,124 @@ export default async function AdminProductsPage({
         </p>
       ) : (
         <>
-          <MobileProductListAccordion products={products} statsById={statsById} />
+          <MobileProductListAccordion
+            products={products}
+            statsById={statsById}
+          />
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white text-sm md:block">
-          <table className="min-w-full text-left">
-            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2">Thumbnail</th>
-                <th className="px-3 py-2">Namn</th>
-                <th className="px-3 py-2">Slug</th>
-                <th className="px-3 py-2">Kategori</th>
-                <th className="px-3 py-2">Material</th>
-                <th className="px-3 py-2 text-right">Baspris (kr)</th>
-                <th className="px-3 py-2 text-center">
-                  Varianter (aktiva/total)
-                </th>
-                <th className="px-3 py-2 text-center">Status</th>
-                <th className="px-3 py-2 text-center">Problem</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => {
-                const stats = statsById[p.id];
-                const activeCount = stats?.activeCount ?? 0;
-                const minActiveStock = stats?.minActiveStock ?? null;
-                const hasActiveMissingImages = (stats?.activeMissingImagesCount ?? 0) > 0;
-                const hasProblem =
-                  (p.published && !p.canonicalImage) ||
-                  (p.published && activeCount === 0) ||
-                  (!p.canonicalImage && hasActiveMissingImages);
+            <table className="min-w-full text-left">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-3 py-2">Image</th>
+                  <th className="px-3 py-2">Namn</th>
+                  <th className="px-3 py-2">Slug</th>
+                  <th className="px-3 py-2">Kategori</th>
+                  <th className="px-3 py-2">Material</th>
+                  <th className="px-3 py-2 text-center">
+                    Varianter (aktiva/total)
+                  </th>
+                  <th className="px-3 py-2 text-center">Status</th>
+                  <th className="px-3 py-2 text-center">Problem</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => {
+                  const stats = statsById[p.id];
+                  const activeCount = stats?.activeCount ?? 0;
+                  const minActiveStock = stats?.minActiveStock ?? null;
+                  const hasProblem = p.published && activeCount === 0;
+                  const imageUrl = getProductCardImage(p as any);
 
-                return (
-                  <tr
-                    key={p.id}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
-                  >
-                    <td className="px-3 py-2">
-                      {p.canonicalImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={p.canonicalImage}
-                          alt={p.name}
-                          className="h-10 w-10 rounded-md object-cover ring-1 ring-slate-200"
-                        />
-                      ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-md border border-dashed border-slate-200 text-[10px] text-slate-400">
-                          Ingen bild
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-sm font-medium text-slate-900">
-                      <Link
-                        href={`/admin/products/${p.id}`}
-                        className="underline-offset-2 hover:underline"
-                      >
-                        {p.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-2 text-xs font-mono text-slate-600">
-                      {p.slug}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-slate-600">
-                      {p.category?.name ?? '–'}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-slate-600">
-                      {p.material?.name ?? '–'}
-                    </td>
-                    <td className="px-3 py-2 text-right text-sm tabular-nums">
-                      {p.priceInCents != null ? Math.round(p.priceInCents / 100) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs text-slate-700">
-                      {activeCount}/{p._count.variants}
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs">
-                      <span
-                        className={
-                          p.published
-                            ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
-                            : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'
-                        }
-                      >
-                        {p.published ? 'Published' : 'Draft'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center text-xs">
-                      {hasProblem && (
-                        <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                          Problem
-                        </span>
-                      )}
-                      {minActiveStock != null && minActiveStock < 3 && (
-                        <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                          Low stock
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-right text-xs">
-                      <div className="flex justify-end gap-2">
-                        <Link
-                          href={`/product/${p.slug}`}
-                          className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          Preview
-                        </Link>
+                  return (
+                    <tr
+                      key={p.id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70"
+                    >
+                      <td className="px-3 py-2">
+                        {imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={imageUrl}
+                            alt={p.name}
+                            className="h-8 w-8 rounded-md object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-slate-200 text-[9px] text-slate-400">
+                            No img
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-sm font-medium text-slate-900">
                         <Link
                           href={`/admin/products/${p.id}`}
-                          className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                          className="underline-offset-2 hover:underline"
                         >
-                          Edit
+                          {p.name}
                         </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-3 py-2 text-xs font-mono text-slate-600">
+                        {p.slug}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-slate-600">
+                        {p.category?.name ?? '–'}
+                      </td>
+                      <td className="px-3 py-2 text-sm text-slate-600">
+                        {p.material?.name ?? '–'}
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs text-slate-700">
+                        {activeCount}/{p._count.variants}
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        <span
+                          className={
+                            p.published
+                              ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700'
+                              : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600'
+                          }
+                        >
+                          {p.published ? 'Published' : 'Draft'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-xs">
+                        {hasProblem && (
+                          <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            Problem
+                          </span>
+                        )}
+                        {minActiveStock != null && minActiveStock < 3 && (
+                          <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            Low stock
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-xs">
+                        <div className="flex justify-end gap-2">
+                          <Link
+                            href={`/product/${p.slug}`}
+                            className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Preview
+                          </Link>
+                          <Link
+                            href={`/admin/products/${p.id}`}
+                            className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            Edit
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
-              Visar {from}–{to} av {totalCount} (sida {effectivePage}/{totalPages})
+              Visar {from}–{to} av {totalCount} (sida {effectivePage}/
+              {totalPages})
             </div>
             <div className="flex items-center justify-end gap-2">
               {effectivePage > 1 ? (

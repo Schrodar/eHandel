@@ -107,7 +107,12 @@ function FormFeedback({
 
   return (
     <>
-      {pending && (showOverlay ? <PendingOverlay message={pendingMessage} /> : <PendingToast message={pendingMessage} />)}
+      {pending &&
+        (showOverlay ? (
+          <PendingOverlay message={pendingMessage} />
+        ) : (
+          <PendingToast message={pendingMessage} />
+        ))}
 
       {showLocalToast && toastMessage && (
         <div
@@ -131,6 +136,7 @@ export type AdminFormProps = Omit<
   toastVariant?: ToastVariant;
   pendingMessage?: string;
   showOverlay?: boolean;
+  confirmMessage?: string;
 };
 
 export default function AdminForm({
@@ -140,13 +146,23 @@ export default function AdminForm({
   toastVariant = 'success',
   pendingMessage = 'Sparar…',
   showOverlay = false,
+  confirmMessage,
   ...formProps
 }: AdminFormProps) {
   return (
     <form
       {...formProps}
-      action={action as unknown as React.ComponentPropsWithoutRef<'form'>['action']}
-      onSubmit={() => {
+      action={
+        action as unknown as React.ComponentPropsWithoutRef<'form'>['action']
+      }
+      onSubmit={(event) => {
+        if (confirmMessage && typeof window !== 'undefined') {
+          const confirmed = window.confirm(confirmMessage);
+          if (!confirmed) {
+            event.preventDefault();
+            return;
+          }
+        }
         if (toastMessage) {
           writeToastToSession({
             message: toastMessage,

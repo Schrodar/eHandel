@@ -18,8 +18,6 @@ async function getKpis() {
     lowStockVariantCount,
     activeVariantAgg,
     publishedNoActiveVariants,
-    publishedNoCanonicalImage,
-    activeVariantsMissingImages,
     negativeStockVariants,
     negativePriceVariants,
     emptySkuVariants,
@@ -40,28 +38,6 @@ async function getKpis() {
       where: { published: true, variants: { none: { active: true } } },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
-      take: LIMIT,
-    }),
-    prisma.product.findMany({
-      where: { published: true, canonicalImage: null },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-      take: LIMIT,
-    }),
-    prisma.productVariant.findMany({
-      where: {
-        active: true,
-        OR: [
-          { images: { equals: Prisma.DbNull } },
-          { images: { equals: Prisma.JsonNull } },
-        ],
-        product: { canonicalImage: null },
-      },
-      select: {
-        id: true,
-        sku: true,
-        product: { select: { id: true, name: true } },
-      },
       take: LIMIT,
     }),
     prisma.productVariant.findMany({
@@ -99,8 +75,7 @@ async function getKpis() {
       minStock: row._min?.stock ?? null,
     }))
     .filter(
-      (row) =>
-        (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD,
+      (row) => (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD,
     )
     .map((row) => ({
       productId: row.productId,
@@ -142,22 +117,6 @@ async function getKpis() {
       productId: p.id,
       productName: p.name,
       type: 'Published men har 0 aktiva varianter',
-    });
-  }
-
-  for (const p of publishedNoCanonicalImage) {
-    issues.push({
-      productId: p.id,
-      productName: p.name,
-      type: 'Published men saknar canonical image',
-    });
-  }
-
-  for (const v of activeVariantsMissingImages) {
-    issues.push({
-      productId: v.product.id,
-      productName: v.product.name,
-      type: 'Aktiv variant saknar bilder (och produkten saknar canonical image)',
     });
   }
 
@@ -329,7 +288,9 @@ export default async function AdminDashboardPage() {
 
       <section aria-label="Låg lagernivå" className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-900">Låg lagernivå</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            Låg lagernivå
+          </h2>
           <div className="text-xs text-slate-500">
             Tröskel: min aktiv variant &lt; 3
           </div>

@@ -1,6 +1,6 @@
 // prisma/schema.prisma
 generator client {
-    provider = "prisma-client-js"
+    provider      = "prisma-client-js"
     binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
@@ -48,71 +48,183 @@ model Product {
     priceClass   String @default("standard")
     season       String @default("all")
 
-    canonicalImage String?
-    attributes     Json?
-    published      Boolean @default(true)
+    // Representative variant for product card images and default price
+    defaultVariantId String?         @unique
+    defaultVariant   ProductVariant? @relation("defaultVariant", fields: [defaultVariantId], references: [id])
 
-    variants ProductVariant[]
+    attributes Json?
+    published  Boolean @default(true)
+
+    variants ProductVariant[] @relation("productVariants")
 
     @@index([categoryId])
     @@index([materialId])
+    @@index([defaultVariantId])
 }
 
 model ProductVariant {
     id        String  @id // stable string id from JSON, or you can use sku as id later
     sku       String  @unique // REQUIRED for commerce
     productId String
-    product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+    product   Product @relation("productVariants", fields: [productId], references: [id], onDelete: Cascade)
 
     colorId String?
     color   Color?  @relation(fields: [colorId], references: [id])
 
-    images       Json? // keep flexible for now (array of image paths/objects)
+    images       Json? // deprecated: use VariantImage instead
     priceInCents Int? // optional override; fallback to Product.priceInCents in app
     stock        Int     @default(0) // explicit stock (0 = out of stock)
     attributes   Json?
     active       Boolean @default(true)
+
+    variantImages VariantImage[]
+
+    // Backreference for when this variant is set as default
+    defaultForProduct Product? @relation("defaultVariant")
 
     @@index([productId])
     @@index([colorId])
 }
 
 // Orders stored when customers checkout through Klarna
+enum PaymentProvider {
+    KLARNA
+}
+
+enum PaymentStatus {
+    PENDING
+    AUTHORIZED
+    CAPTURED
+    CANCELLED
+    REFUNDED
+    FAILED
+}
+
+enum OrderStatus {
+    NEW
+    READY_TO_PICK
+    PICKING
+    PACKED
+    SHIPPED
+    COMPLETED
+    CANCELLED
+}
+
 model Order {
-    id               String       @id @default(cuid())
-    orderNumber      String       @unique // human-readable ORDER-YYYY-0001
-    klarnaOrderId    String?      @unique
-    sessionId        String?      @unique
-    status           String       @default("created")
-    customerEmail    String
-    customerFirst    String?
-    customerLast     String?
-    customerPhone    String?
-    streetAddress    String?
-    postalCode       String?
-    city             String?
-    country          String?
-    totalInclVat     Int
-    totalVat         Int
-    metadata         Json?
-    createdAt        DateTime     @default(now())
-    updatedAt        DateTime     @updatedAt
+    id              String          @id @default(cuid())
+    orderNumber     String          @unique // human-readable ORDER-YYYY-0001
+    paymentProvider PaymentProvider @default(KLARNA)
+    klarnaOrderId   String?         @unique
+    paymentStatus   PaymentStatus   @default(PENDING)
+    orderStatus     OrderStatus     @default(NEW)
+
+    customerEmail String
+    customerName  String
+    customerPhone String?
+
+    shippingAddressLine1 String
+    shippingAddressLine2 String?
+    shippingPostalCode   String
+    shippingCity         String
+    shippingCountry      String
+    shippingCarrier      String?
+    shippingTracking     String?
+
+    billingAddressLine1 String?
+    billingAddressLine2 String?
+    billingPostalCode   String?
+    billingCity         String?
+    billingCountry      String?
+
+    subtotal Int
+    shipping Int
+    discount Int
+    tax      Int
+    total    Int
+    currency String
+
+    createdAt    DateTime  @default(now())
+    authorizedAt DateTime?
+    capturedAt   DateTime?
+    shippedAt    DateTime?
+    updatedAt    DateTime  @updatedAt
 
     items OrderItem[]
 
-    @@index([sessionId])
     @@index([klarnaOrderId])
+    @@index([paymentStatus])
+    @@index([orderStatus])
 }
 
 model OrderItem {
-    id                 Int    @id @default(autoincrement())
-    orderId            String
-    order              Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-    productId          String
-    variantId          String?
-    sku                String?
-    quantity           Int
-    priceAtPurchaseOre Int
-    vatBasisPoints     Int
+    id          Int     @id @default(autoincrement())
+    orderId     String
+    order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    productId   String?
+    variantId   String?
+    productName String
+    variantName String?
+    sku         String?
+    quantity    Int
+    unitPrice   Int
+    lineTotal   Int
 }
 
+// Media library: folder hierarchy
+model Folder {
+    id         String        @id @default(cuid())
+    name       String
+    parentId   String?
+    parent     Folder?       @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+    children   Folder[]      @relation("FolderTree")
+    assetLinks AssetFolder[]
+    createdAt  DateTime      @default(now())
+    updatedAt  DateTime      @updatedAt
+
+    @@index([parentId])
+}
+
+// Media library: assets (images, files)
+model Asset {
+    id        String         @id @default(cuid())
+    type      String         @default("image") // image, video, etc.
+    status    String         @default("ready") // ready | processing | failed
+    url       String
+    width     Int?
+    height    Int?
+    alt       String?
+    folders   AssetFolder[]
+    variants  VariantImage[]
+    createdAt DateTime       @default(now())
+    updatedAt DateTime       @updatedAt
+
+    @@index([status])
+}
+
+// Media library: many-to-many Asset <-> Folder (assets can be in multiple folders)
+model AssetFolder {
+    assetId   String
+    folderId  String
+    asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+    folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+
+    @@id([assetId, folderId])
+    @@index([folderId])
+}
+
+// Variant gallery: many-to-many ProductVariant <-> Asset (with sortOrder + role)
+model VariantImage {
+    variantId String
+    assetId   String
+    role      String         @default("secondary") // primary | secondary
+    sortOrder Int            @default(0)
+    variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+    asset     Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+    createdAt DateTime       @default(now())
+
+    @@id([variantId, assetId])
+    @@unique([variantId, role]) // Only one primary per variant
+    @@index([variantId, sortOrder])
+    @@index([assetId])
+}

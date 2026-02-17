@@ -23,16 +23,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: 'Product not found' };
   }
 
-  const name = productFromDb?.name ?? fallback!.name;
-  const material = productFromDb?.materialName ?? fallback!.material;
-  const imagePath = productFromDb?.canonicalImage ?? fallback!.image;
+  const name = productFromDb?.name ?? fallback?.name ?? 'Product';
+  const material =
+    productFromDb?.materialName ?? fallback?.material ?? 'Unknown';
+  const imagePath =
+    productFromDb?.variants?.[0]?.images?.[0] ??
+    fallback?.image ??
+    '/product-w-001.svg';
 
   const siteUrl =
     process.env.SITE_URL ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     'https://example.com';
   const canonical = new URL(
-    `/product/${productFromDb?.slug ?? fallback!.id}`,
+    `/product/${productFromDb?.slug ?? fallback?.id ?? resolvedParams.id}`,
     siteUrl,
   ).toString();
   const imageUrl = imagePath.startsWith('http')
@@ -80,21 +84,22 @@ export default async function ProductPage({ params }: Props) {
   const jsonLd = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
-    name: productFromDb?.name ?? fallback!.name,
+    name: productFromDb?.name ?? fallback?.name ?? 'Product',
     image: [
-      productFromDb?.canonicalImage ??
-        (fallback ? fallback.image : '/product-placeholder.png'),
+      productFromDb?.variants?.[0]?.images?.[0] ??
+        fallback?.image ??
+        '/product-w-001.svg',
     ],
-    description: `${productFromDb?.name ?? fallback!.name} — ${
-      productFromDb?.materialName ?? fallback!.material
+    description: `${productFromDb?.name ?? fallback?.name ?? 'Product'} — ${
+      productFromDb?.materialName ?? fallback?.material ?? 'Unknown'
     }`,
-    sku: productFromDb?.id ?? fallback!.id,
+    sku: productFromDb?.id ?? fallback?.id ?? 'unknown',
     brand: { '@type': 'Organization', name: 'SAZZE' },
     offers: {
       '@type': 'Offer',
       price: productFromDb
         ? Math.round(productFromDb.priceInCents / 100)
-        : fallback!.price,
+        : (fallback?.price ?? 0),
       priceCurrency: 'SEK',
       availability: 'https://schema.org/InStock',
     },
@@ -122,7 +127,6 @@ export default async function ProductPage({ params }: Props) {
             priceInCents: Math.round(fallback!.price * 100),
             priceClass: fallback!.priceClass,
             season: fallback!.season,
-            canonicalImage: fallback!.image,
             attributes: null,
             variants: [
               {

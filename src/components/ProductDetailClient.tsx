@@ -4,7 +4,10 @@ import React, { useMemo, useState } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCartContext } from '@/context/CartProvider';
-import type { StorefrontProduct, StorefrontVariant } from '@/lib/productService';
+import type {
+  StorefrontProduct,
+  StorefrontVariant,
+} from '@/lib/productService';
 
 type Props = {
   product: StorefrontProduct;
@@ -31,9 +34,7 @@ export default function ProductDetailClient({ product }: Props) {
 
   const currentImages = selectedVariant?.images?.length
     ? selectedVariant.images
-    : product.canonicalImage
-      ? [product.canonicalImage]
-      : [];
+    : [];
 
   const primaryImage = currentImages[0] ?? '/product-placeholder.png';
 
@@ -95,7 +96,9 @@ export default function ProductDetailClient({ product }: Props) {
                       Price class: {product.priceClass}
                     </p>
                     <p className="mt-1 text-xs text-black/60">
-                      {inStock ? `I lager (${selectedVariant?.stock ?? 0} st)` : 'Slut i lager'}
+                      {inStock
+                        ? `I lager (${selectedVariant?.stock ?? 0} st)`
+                        : 'Slut i lager'}
                     </p>
                   </div>
                 </div>
@@ -133,7 +136,9 @@ export default function ProductDetailClient({ product }: Props) {
                     })}
                   </div>
 
-                  <div className="text-sm text-slate-600">Color: {colorLabel}</div>
+                  <div className="text-sm text-slate-600">
+                    Color: {colorLabel}
+                  </div>
                 </div>
 
                 <button
@@ -167,8 +172,9 @@ export default function ProductDetailClient({ product }: Props) {
                       Description
                     </summary>
                     <p className="mt-2 text-sm leading-6 text-black/70">
-                      {product.name} — {product.materialName}. Season:{' '}
-                      {product.season}.
+                      {product.description?.trim()
+                        ? product.description
+                        : `${product.name} — ${product.materialName}. Season: ${product.season}.`}
                     </p>
                   </details>
                 </div>

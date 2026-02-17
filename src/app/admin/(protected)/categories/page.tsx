@@ -50,7 +50,9 @@ async function deleteCategory(formData: FormData) {
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
-function toStringParam(value: string | string[] | undefined): string | undefined {
+function toStringParam(
+  value: string | string[] | undefined,
+): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value ?? undefined;
 }
@@ -58,16 +60,17 @@ function toStringParam(value: string | string[] | undefined): string | undefined
 export default async function AdminCategoriesPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
   const categories = await prisma.category.findMany({
     orderBy: { name: 'asc' },
   });
 
-  const error = toStringParam(searchParams?.error);
-  const deleted = toStringParam(searchParams?.deleted);
-  const errorId = toStringParam(searchParams?.id);
-  const errorCount = toStringParam(searchParams?.count);
+  const params = await searchParams;
+  const error = toStringParam(params?.error);
+  const deleted = toStringParam(params?.deleted);
+  const errorId = toStringParam(params?.id);
+  const errorCount = toStringParam(params?.count);
 
   return (
     <div className="space-y-6">
@@ -85,7 +88,8 @@ export default async function AdminCategoriesPage({
             <div>Kategorin togs bort.</div>
           ) : error === 'in-use' ? (
             <div>
-              Kan inte ta bort kategori{errorId ? ` "${errorId}"` : ''} eftersom den används av {errorCount ?? 'en eller flera'} produkter.
+              Kan inte ta bort kategori{errorId ? ` "${errorId}"` : ''} eftersom
+              den används av {errorCount ?? 'en eller flera'} produkter.
             </div>
           ) : (
             <div>Något gick fel vid borttag.</div>
@@ -105,7 +109,10 @@ export default async function AdminCategoriesPage({
             </thead>
             <tbody>
               {categories.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                <tr
+                  key={c.id}
+                  className="border-b border-slate-100 last:border-0"
+                >
                   <td className="px-3 py-2 font-mono text-xs text-slate-500">
                     {c.id}
                   </td>
@@ -156,7 +163,9 @@ export default async function AdminCategoriesPage({
           </table>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Ny kategori</h2>
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">
+            Ny kategori
+          </h2>
           <AdminForm
             action={upsertCategory}
             className="space-y-3"

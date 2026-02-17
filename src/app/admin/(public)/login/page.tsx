@@ -10,7 +10,9 @@ export const dynamic = 'force-dynamic';
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
-function toStringParam(value: string | string[] | undefined): string | undefined {
+function toStringParam(
+  value: string | string[] | undefined,
+): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value ?? undefined;
 }
@@ -18,10 +20,11 @@ function toStringParam(value: string | string[] | undefined): string | undefined
 export default async function AdminLoginPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams?: Promise<SearchParams>;
 }) {
-  const next = toStringParam(searchParams?.next) ?? '/admin';
-  const error = toStringParam(searchParams?.error);
+  const params = await searchParams;
+  const next = toStringParam(params?.next) ?? '/admin';
+  const error = toStringParam(params?.error);
 
   return (
     <div className="mx-auto flex min-h-[80vh] max-w-md items-center px-4">
@@ -35,7 +38,9 @@ export default async function AdminLoginPage({
 
         {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-            {error === 'invalid' ? 'Fel e-post eller lösenord.' : 'Något gick fel.'}
+            {error === 'invalid'
+              ? 'Fel e-post eller lösenord.'
+              : 'Något gick fel.'}
           </div>
         )}
 
