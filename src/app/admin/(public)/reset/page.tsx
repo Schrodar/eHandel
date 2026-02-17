@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
-
 export default function AdminResetPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -13,43 +11,25 @@ export default function AdminResetPage() {
   const [confirm, setConfirm] = useState('');
   const [sending, setSending] = useState(false);
 
-  const tokens = useMemo(() => {
+  const accessToken = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
     const params = new URLSearchParams(hash);
-    const access_token = params.get('access_token');
-    const refresh_token = params.get('refresh_token');
-    const type = params.get('type');
-    return { access_token, refresh_token, type };
+    return params.get('access_token');
   }, []);
 
   useEffect(() => {
-    async function init() {
-      try {
-        const supabase = createBrowserSupabaseClient();
-
-        if (tokens?.access_token && tokens?.refresh_token) {
-          // Set the session so we can call updateUser.
-          // supabase-js v2 supports setSession.
-          await supabase.auth.setSession({
-            access_token: tokens.access_token,
-            refresh_token: tokens.refresh_token,
-          });
-        }
-
-        setReady(true);
-      } catch (err: any) {
-        setError(err?.message ?? String(err));
-        setReady(true);
-      }
-    }
-
-    init();
-  }, [tokens]);
+    setReady(true);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!accessToken) {
+      setError('Ogiltig länk eller token saknas');
+      return;
+    }
 
     if (password.length < 8) {
       setError('Lösenord måste vara minst 8 tecken');
@@ -62,18 +42,35 @@ export default function AdminResetPage() {
 
     setSending(true);
     try {
-      const supabase = createBrowserSupabaseClient();
-      const { error: updateError } = await supabase.auth.updateUser({ password });
-      if (updateError) {
-        setError(updateError.message || 'Kunde inte uppdatera lösenordet');
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        // Normalize server errors to user-friendly messages
+        if (data?.error === 'invalid_or_expired_token') {
+          setError('Länken är ogiltig eller har gått ut. Begär en ny återställning.');
+        } else if (data?.error === 'password_too_short') {
+          setError('Lösenordet är för kort. Minst 8 tecken krävs.');
+        } else if (data?.error === 'too_many_requests') {
+          setError('För många försök. Vänta en stund och försök igen.');
+        } else {
+          setError('Ett fel uppstod. Försök igen.');
+        }
         setSending(false);
         return;
       }
 
-      // Redirect to login with a success flag
-      router.push('/admin/login?reset=success');
+      // Success
+      router.replace('/admin/login?reset=success');
     } catch (err: any) {
-      setError(err?.message ?? String(err));
+      setError('Ett oväntat fel uppstod');
       setSending(false);
     }
   }

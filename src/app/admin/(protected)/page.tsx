@@ -155,13 +155,51 @@ async function getKpis() {
 }
 
 export default async function AdminDashboardPage() {
+  let kpis;
+  let dbError: string | null = null;
+  
+  try {
+    kpis = await getKpis();
+  } catch (err: any) {
+    // If DATABASE_URL is placeholder or invalid, show setup UI instead of crashing
+    dbError = err?.message ?? 'Database connection failed';
+    kpis = null;
+  }
+  
+  if (!kpis) {
+    return (
+      <div className="space-y-8">
+        <header className="space-y-2">
+          <h1 className="text-2xl font-serif">Admin – Dashboard</h1>
+          <p className="text-sm text-slate-600">Database setup required</p>
+        </header>
+        
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6">
+          <h2 className="font-semibold text-amber-900">Database Configuration Required</h2>
+          <p className="mt-2 text-sm text-amber-800">
+            {dbError}
+          </p>
+          <p className="mt-2 text-sm text-amber-700">
+            Please update your <code className="rounded bg-amber-100 px-1">DATABASE_URL</code> in <code className="rounded bg-amber-100 px-1">.env</code> with valid Supabase credentials.
+          </p>
+          <ul className="mt-3 list-inside list-disc text-sm text-amber-700">
+            <li>Go to your Supabase project → Settings → Database</li>
+            <li>Copy the connection string (URI)</li>
+            <li>Replace <code className="rounded bg-amber-100 px-1">YOUR_PASSWORD</code> with your actual database password</li>
+            <li>Run <code className="rounded bg-amber-100 px-1">npm run dev</code> again</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+  
   const {
     publishedCount,
     draftCount,
     lowStockCount,
     lowStockProducts,
     issues,
-  } = await getKpis();
+  } = kpis;
 
   return (
     <div className="space-y-8">

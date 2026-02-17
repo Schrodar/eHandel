@@ -13,7 +13,7 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^6.19.2",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.95.3",
     "framer-motion": "^12.26.2",
