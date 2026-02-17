@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { adminLoginAction } from '@/app/admin/(public)/login/actions';
+import { ForgotPasswordForm } from './ForgotPasswordForm';
 
 type Props = {
   open: boolean;
@@ -12,6 +13,7 @@ type Props = {
 
 export function AdminLoginModal({ open, onClose, error }: Props) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
+  const [showForgot, setShowForgot] = useState(false);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -60,7 +62,8 @@ export function AdminLoginModal({ open, onClose, error }: Props) {
           </div>
         )}
 
-        <form action={adminLoginAction} className="mt-4 space-y-4">
+        {!showForgot && (
+          <form action={adminLoginAction} className="mt-4 space-y-4">
           <input type="hidden" name="next" value="/admin" />
           <input type="hidden" name="source" value="home" />
 
@@ -101,6 +104,34 @@ export function AdminLoginModal({ open, onClose, error }: Props) {
             Efter inloggning krävs tvåstegsverifiering (TOTP) för admin.
           </p>
         </form>
+        )}
+
+        {!showForgot && (
+          <div className="mt-3 text-sm">
+            <button
+              type="button"
+              onClick={() => setShowForgot(true)}
+              className="text-xs text-slate-600 underline-offset-2 hover:underline"
+            >
+              Glömt lösenord?
+            </button>
+          </div>
+        )}
+
+        {showForgot && (
+          <div className="mt-4">
+            <ForgotPasswordForm compact />
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowForgot(false)}
+                className="text-xs text-slate-600 underline-offset-2 hover:underline"
+              >
+                Tillbaka till inloggning
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

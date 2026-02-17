@@ -25,6 +25,7 @@ export default async function AdminLoginPage({
   const params = await searchParams;
   const next = toStringParam(params?.next) ?? '/admin';
   const error = toStringParam(params?.error);
+  const resetSuccess = toStringParam(params?.reset) === 'success';
 
   return (
     <div className="mx-auto flex min-h-[80vh] max-w-md items-center px-4">
@@ -35,6 +36,12 @@ export default async function AdminLoginPage({
             Logga in för att administrera produkter och ordrar.
           </p>
         </header>
+
+        {resetSuccess && (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900">
+            Lösenord uppdaterat. Logga in med ditt nya lösenord.
+          </div>
+        )}
 
         {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
@@ -81,6 +88,11 @@ export default async function AdminLoginPage({
             Logga in
           </button>
         </form>
+        <div className="mt-2 text-xs text-slate-500">
+          <a href="/admin/reset" className="underline-offset-2 hover:underline">
+            Glömt lösenord?
+          </a>
+        </div>
 
         <div className="text-xs text-slate-500">
           <Link href="/" className="underline-offset-2 hover:underline">
