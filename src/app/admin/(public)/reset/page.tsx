@@ -1,35 +1,51 @@
 "use client";
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+
+type FlowMode = 'pkce' | 'hash' | 'unknown';
 
 export default function AdminResetPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [mode, setMode] = useState<FlowMode>('unknown');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [sending, setSending] = useState(false);
 
-  const accessToken = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : '';
-    const params = new URLSearchParams(hash);
-    return params.get('access_token');
-  }, []);
-
   useEffect(() => {
-    setReady(true);
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+
+    if (code) {
+      // PKCE flow – exchange the code for a session
+      setMode('pkce');
+      const supabase = createBrowserSupabaseClient();
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          setError('Länken är ogiltig eller har gått ut. Begär en ny återställning.');
+        }
+        setReady(true);
+      });
+    } else {
+      // Implicit flow – read token from hash (#access_token=...)
+      const hash = window.location.hash.startsWith('#')
+        ? window.location.hash.slice(1)
+        : '';
+      const params = new URLSearchParams(hash);
+      const token = params.get('access_token');
+      setAccessToken(token);
+      setMode('hash');
+      setReady(true);
+    }
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
-    if (!accessToken) {
-      setError('Ogiltig länk eller token saknas');
-      return;
-    }
 
     if (password.length < 8) {
       setError('Lösenord måste vara minst 8 tecken');
@@ -41,7 +57,29 @@ export default function AdminResetPage() {
     }
 
     setSending(true);
+
     try {
+      if (mode === 'pkce') {
+        // Session is already set after exchangeCodeForSession – update directly
+        const supabase = createBrowserSupabaseClient();
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+        if (updateError) {
+          setError('Kunde inte uppdatera lösenordet. Försök begära en ny länk.');
+          setSending(false);
+          return;
+        }
+        await supabase.auth.signOut();
+        router.replace('/admin/login?reset=success');
+        return;
+      }
+
+      // Implicit/hash flow – use server route with bearer token
+      if (!accessToken) {
+        setError('Ogiltig länk eller token saknas. Begär en ny återställning.');
+        setSending(false);
+        return;
+      }
+
       const res = await fetch('/api/admin/reset-password', {
         method: 'POST',
         headers: {
@@ -53,7 +91,6 @@ export default function AdminResetPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        // Normalize server errors to user-friendly messages
         if (data?.error === 'invalid_or_expired_token') {
           setError('Länken är ogiltig eller har gått ut. Begär en ny återställning.');
         } else if (data?.error === 'password_too_short') {
@@ -67,9 +104,8 @@ export default function AdminResetPage() {
         return;
       }
 
-      // Success
       router.replace('/admin/login?reset=success');
-    } catch (err: any) {
+    } catch {
       setError('Ett oväntat fel uppstod');
       setSending(false);
     }

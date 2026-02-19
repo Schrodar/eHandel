@@ -46,6 +46,7 @@ export async function middleware(req: NextRequest) {
   const isLogin = pathname === '/admin/login';
   const is403 = pathname === '/admin/403';
   const isMfa = pathname === '/admin/mfa';
+  const isReset = pathname === '/admin/reset';
 
   // Auth: use getUser() (not getSession()) for server-side validation.
   const { data: userData } = await supabase.auth.getUser();
@@ -53,7 +54,7 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     // Not logged in.
-    if (isLogin || is403) return res;
+    if (isLogin || is403 || isReset) return res;
     if (isMfa) return redirectTo(req, '/admin/login');
 
     const loginUrl = req.nextUrl.clone();
@@ -74,7 +75,7 @@ export async function middleware(req: NextRequest) {
     const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     const aal = aalData?.currentLevel ?? 'aal1';
     if (aal !== 'aal2') {
-      if (isMfa) return res;
+      if (isMfa || isReset) return res;
       return redirectTo(req, '/admin/mfa');
     }
   }
