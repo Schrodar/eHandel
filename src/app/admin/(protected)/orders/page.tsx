@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { listOrders } from '@/lib/orders/queries';
+import { formatPaymentStatus, formatOrderStatus } from '@/lib/orders/formatters';
 import AdminForm from '@/components/admin/AdminForm';
 import { createTestOrder } from './actions';
 
@@ -73,6 +74,34 @@ function getNextAction(order: {
   return '—';
 }
 
+function parseLocalDate(
+  dateString: string,
+  endOfDay: boolean,
+): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return undefined;
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+
+  const date = endOfDay
+    ? new Date(year, monthIndex, day, 23, 59, 59, 999)
+    : new Date(year, monthIndex, day, 0, 0, 0, 0);
+
+  // Kontrollera att datumet inte "rullade över"
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== monthIndex ||
+    date.getDate() !== day
+  ) {
+    return undefined;
+  }
+
+  return date;
+}
+
+
 function buildPageHref(params: SearchParams, page: number): { href: string } {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -102,19 +131,25 @@ export default async function OrdersPage({
     ? orderStatusParam
     : undefined;
 
-  const from = fromParam ? new Date(fromParam) : undefined;
-  const to = toParam ? new Date(toParam) : undefined;
+ let from = fromParam ? parseLocalDate(fromParam, false) : undefined;
+let to = toParam ? parseLocalDate(toParam, true) : undefined;
+
+if (from && to && from > to) {
+  [from, to] = [to, from];
+}
+
 
   const page = toIntParam(searchParams.page, 1);
 
-  const { orders, total, pageSize } = await listOrders({
-    paymentStatus,
-    orderStatus,
-    query,
-    from: Number.isNaN(from?.getTime()) ? undefined : from,
-    to: Number.isNaN(to?.getTime()) ? undefined : to,
-    page,
-  });
+const { orders, total, pageSize } = await listOrders({
+  paymentStatus,
+  orderStatus,
+  query,
+  from,
+  to,
+  page,
+});
+
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -155,10 +190,10 @@ export default async function OrdersPage({
           defaultValue={paymentStatus ?? ''}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
         >
-          <option value="">PaymentStatus</option>
+          <option value="">Betalning</option>
           {Object.values(PaymentStatus).map((status) => (
             <option key={status} value={status}>
-              {status}
+              {formatPaymentStatus(status)}
             </option>
           ))}
         </select>
@@ -167,10 +202,10 @@ export default async function OrdersPage({
           defaultValue={orderStatus ?? ''}
           className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
         >
-          <option value="">OrderStatus</option>
+          <option value="">Orderstatus</option>
           {Object.values(OrderStatus).map((status) => (
             <option key={status} value={status}>
-              {status}
+              {formatOrderStatus(status)}
             </option>
           ))}
         </select>
@@ -225,10 +260,10 @@ export default async function OrdersPage({
                   {order.customerEmail}
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {order.paymentStatus}
+                  {formatPaymentStatus(order.paymentStatus)}
                 </td>
                 <td className="px-4 py-3 text-slate-600">
-                  {order.orderStatus}
+                  {formatOrderStatus(order.orderStatus)}
                 </td>
                 <td className="px-4 py-3 font-semibold text-slate-900">
                   {formatMoney(order.total, order.currency)}

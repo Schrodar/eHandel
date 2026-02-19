@@ -16,7 +16,7 @@ export type OrderActionResult = {
   message: string;
 };
 
-export async function createTestOrder(_formData?: FormData): Promise<void> {
+export async function createTestOrder(): Promise<void> {
   await requireAdminSession();
   await createTestOrderRecord();
   revalidatePath('/admin/orders');
@@ -50,6 +50,35 @@ export async function startPicking(
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath('/admin/orders');
   return { ok: true, message: 'Plockning startad' };
+}
+
+export async function undoPickingToNew(
+  orderId: string,
+): Promise<OrderActionResult> {
+  await requireAdminSession();
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { orderStatus: true },
+  });
+
+  if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  if (order.orderStatus !== OrderStatus.PICKING) {
+    return {
+      ok: false,
+      message: 'Kan inte ångra plock – status är inte PICKING',
+    };
+  }
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { orderStatus: OrderStatus.NEW },
+  });
+
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath('/admin/orders');
+  return { ok: true, message: 'Plockning ångrad – order återställd till Ny' };
 }
 
 export async function markPacked(orderId: string): Promise<OrderActionResult> {
@@ -254,6 +283,7 @@ export async function capturePayment(
     data: {
       paymentStatus: PaymentStatus.CAPTURED,
       capturedAt: new Date(),
+      orderStatus: OrderStatus.COMPLETED,
     },
   });
 
@@ -272,10 +302,18 @@ export async function cancelAuthorization(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { klarnaOrderId: true, paymentStatus: true },
+    select: { klarnaOrderId: true, paymentStatus: true, orderStatus: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  if (
+    order.orderStatus === OrderStatus.SHIPPED ||
+    order.orderStatus === OrderStatus.COMPLETED
+  ) {
+    return { ok: false, message: 'Kan inte avbryta efter skickad' };
+  }
+
   if (order.paymentStatus !== PaymentStatus.AUTHORIZED) {
     return { ok: false, message: 'Betalningen är inte auktoriserad' };
   }
@@ -296,7 +334,10 @@ export async function cancelAuthorization(
 
   await prisma.order.update({
     where: { id: orderId },
-    data: { paymentStatus: PaymentStatus.CANCELLED },
+    data: {
+      paymentStatus: PaymentStatus.CANCELLED,
+      orderStatus: OrderStatus.CANCELLED,
+    },
   });
 
   revalidatePath(`/admin/orders/${orderId}`);
@@ -312,10 +353,11 @@ export async function refundPayment(params: {
 
   const order = await prisma.order.findUnique({
     where: { id: params.orderId },
-    select: { klarnaOrderId: true, paymentStatus: true },
+    select: { klarnaOrderId: true, paymentStatus: true, orderStatus: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
   if (order.paymentStatus !== PaymentStatus.CAPTURED) {
     return { ok: false, message: 'Betalningen är inte capturerad' };
   }
@@ -334,7 +376,10 @@ export async function refundPayment(params: {
 
   await prisma.order.update({
     where: { id: params.orderId },
-    data: { paymentStatus: PaymentStatus.REFUNDED },
+    data: {
+      paymentStatus: PaymentStatus.REFUNDED,
+      orderStatus: OrderStatus.COMPLETED,
+    },
   });
 
   revalidatePath(`/admin/orders/${params.orderId}`);

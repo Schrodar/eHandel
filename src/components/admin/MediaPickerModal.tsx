@@ -45,40 +45,58 @@ export default function MediaPickerModal({
     new Set(),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setLoadError(null);
+
+      const [foldersRes, assetsRes] = await Promise.all([
+        fetch('/api/admin/media/folders'),
+        fetch('/api/admin/media/assets?limit=60'),
+      ]);
+
+      if (!foldersRes.ok) {
+        const body = await foldersRes.json().catch(() => ({}));
+        throw new Error(
+          body?.error ??
+            `Mappar: HTTP ${foldersRes.status} ${foldersRes.statusText}`,
+        );
+      }
+      if (!assetsRes.ok) {
+        const body = await assetsRes.json().catch(() => ({}));
+        throw new Error(
+          body?.error ??
+            `Bilder: HTTP ${assetsRes.status} ${assetsRes.statusText}`,
+        );
+      }
+
+      const foldersData = await foldersRes.json();
+      const assetsData = await assetsRes.json();
+
+      setFolders(foldersData);
+      // Handle both old array format and new {items, nextCursor} format
+      if (Array.isArray(assetsData)) {
+        setAssets(assetsData);
+        setNextCursor(null);
+      } else {
+        setAssets(assetsData.items || []);
+        setNextCursor(assetsData.nextCursor || null);
+      }
+    } catch (err) {
+      console.error('Kunde inte läsa in bilder:', err);
+      setLoadError(
+        err instanceof Error ? err.message : 'Okänt fel vid inläsning av bilder',
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Hämta mappar och assets
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [foldersRes, assetsRes] = await Promise.all([
-          fetch('/api/admin/media/folders'),
-          fetch('/api/admin/media/assets?limit=60'),
-        ]);
-
-        if (!foldersRes.ok || !assetsRes.ok)
-          throw new Error('Kunde inte läsa in data');
-
-        const foldersData = await foldersRes.json();
-        const assetsData = await assetsRes.json();
-
-        setFolders(foldersData);
-        // Handle both old array format and new {items, nextCursor} format
-        if (Array.isArray(assetsData)) {
-          setAssets(assetsData);
-          setNextCursor(null);
-        } else {
-          setAssets(assetsData.items || []);
-          setNextCursor(assetsData.nextCursor || null);
-        }
-      } catch (err) {
-        console.error('Kunde inte läsa in bilder:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelect = async () => {
@@ -174,6 +192,17 @@ export default function MediaPickerModal({
             {loading ? (
               <div className="flex items-center justify-center py-8 text-sm text-slate-500">
                 Laddar…
+              </div>
+            ) : loadError ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-10">
+                <p className="text-sm font-medium text-red-600">Kunde inte läsa in bilder</p>
+                <p className="text-xs text-slate-500">{loadError}</p>
+                <button
+                  onClick={loadData}
+                  className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Försök igen
+                </button>
               </div>
             ) : filteredAssets.length === 0 ? (
               <div className="flex items-center justify-center py-8 text-sm text-slate-500">

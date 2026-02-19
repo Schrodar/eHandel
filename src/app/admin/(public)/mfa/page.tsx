@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { checkMFAStatus, requireAdminSession } from '@/lib/adminAuth';
 import { cancelSetupAction, rotateTotpAction, startEnrollAction, verifyMfaAction } from './actions';
 import { TotpQr } from '@/components/admin/TotpQr';
+import AdminForm from '@/components/admin/AdminForm';
 
 export const metadata = {
   title: 'Admin – MFA',
@@ -140,7 +141,13 @@ export default async function AdminMfaPage({
               </div>
             </div>
 
-            <form action={verifyMfaAction} className="space-y-3">
+            <AdminForm
+              action={verifyMfaAction}
+              className="space-y-3"
+              pendingMessage="Verifierar…"
+              toastMessage={undefined}
+              showOverlay={false}
+            >
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   2) Ange 6-siffrig kod
@@ -160,7 +167,7 @@ export default async function AdminMfaPage({
               >
                 Verifiera
               </button>
-            </form>
+            </AdminForm>
 
             <form action={cancelSetupAction}>
               <button
@@ -181,7 +188,13 @@ export default async function AdminMfaPage({
               </div>
             )}
 
-            <form action={verifyMfaAction} className="space-y-3">
+            <AdminForm
+              action={verifyMfaAction}
+              className="space-y-3"
+              pendingMessage="Verifierar…"
+              toastMessage={undefined}
+              showOverlay={false}
+            >
               <div>
                 <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-600">
                   Kod från Authenticator
@@ -201,7 +214,7 @@ export default async function AdminMfaPage({
               >
                 Verifiera och fortsätt
               </button>
-            </form>
+            </AdminForm>
 
             {isAal2 && (
               <form action={rotateTotpAction}>

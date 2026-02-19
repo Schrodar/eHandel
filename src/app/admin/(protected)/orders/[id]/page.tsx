@@ -1,6 +1,10 @@
 import { notFound } from 'next/navigation';
 import { getOrderById } from '@/lib/orders/queries';
 import OrderDetailClient from '@/components/admin/OrderDetailClient';
+import {
+  formatPaymentStatus,
+  formatOrderStatus,
+} from '@/lib/orders/formatters';
 
 export const metadata = {
   title: 'Admin – Order',
@@ -27,9 +31,10 @@ function formatDate(value: Date | null) {
 export default async function OrderDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const order = await getOrderById(params.id);
+  const { id } = await params;
+  const order = await getOrderById(id);
 
   if (!order) return notFound();
 
@@ -75,7 +80,7 @@ export default async function OrderDetailPage({
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
               <div className="text-xs uppercase text-slate-500">Payment</div>
               <div className="font-semibold text-slate-900">
-                {order.paymentStatus}
+               {formatPaymentStatus(order.paymentStatus)}
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
@@ -83,7 +88,8 @@ export default async function OrderDetailPage({
                 Orderstatus
               </div>
               <div className="font-semibold text-slate-900">
-                {order.orderStatus}
+                {formatOrderStatus(order.orderStatus)}
+
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">

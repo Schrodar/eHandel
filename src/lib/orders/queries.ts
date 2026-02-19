@@ -49,12 +49,13 @@ export async function listOrders(filters: OrderListFilters) {
 
   const query = filters.query?.trim();
   if (query) {
-    where.OR = [
-      { orderNumber: { contains: query, mode: 'insensitive' } },
-      { id: { contains: query, mode: 'insensitive' } },
-      { customerEmail: { contains: query, mode: 'insensitive' } },
-      { klarnaOrderId: { contains: query, mode: 'insensitive' } },
-    ];
+where.OR = [
+  { orderNumber: { contains: query } },
+  { id: { contains: query } },
+  { customerEmail: { contains: query } },
+  { klarnaOrderId: { contains: query } },
+];
+
   }
 
   const [orders, total] = await prisma.$transaction([

@@ -7,6 +7,7 @@ import {
   markPacked,
   markShipped,
   startPicking,
+  undoPickingToNew,
   undoPacked,
   undoShipped,
   updateShipping,
@@ -63,11 +64,14 @@ export default function OrderDetailClient({
 
   const allChecked = checked.size === items.length && items.length > 0;
 
-  const pickDisabled =
-    isPending ||
-    !new Set<OrderStatus>([OrderStatus.NEW, OrderStatus.READY_TO_PICK]).has(
-      orderStatus,
-    );
+  const isPickingActive = orderStatus === OrderStatus.PICKING;
+  const canStartPick = new Set<OrderStatus>([
+    OrderStatus.NEW,
+    OrderStatus.READY_TO_PICK,
+  ]).has(orderStatus);
+
+  const pickDisabled = isPending || (!canStartPick && !isPickingActive);
+  const undoPickDisabled = isPending || !isPickingActive;
 
   const packDisabled = isPending || orderStatus !== OrderStatus.PICKING;
   const undoPackedDisabled = isPending || orderStatus !== OrderStatus.PACKED;
@@ -176,14 +180,26 @@ export default function OrderDetailClient({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => runAction(() => startPicking(orderId))}
-            disabled={pickDisabled}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Starta plock
-          </button>
+          {/* Toggle: Starta plock ↔ Ångra starta plock */}
+          {isPickingActive ? (
+            <button
+              type="button"
+              onClick={() => runAction(() => undoPickingToNew(orderId))}
+              disabled={undoPickDisabled}
+              className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Ångra starta plock
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => runAction(() => startPicking(orderId))}
+              disabled={isPending || !canStartPick}
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Starta plock
+            </button>
+          )}
           <button
             type="button"
             onClick={() => runAction(() => markPacked(orderId))}

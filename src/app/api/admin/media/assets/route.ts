@@ -8,9 +8,9 @@ import { requireAdminSession } from '@/lib/adminAuth';
  * Supports pagination via limit and cursor params
  */
 export async function GET(req: NextRequest) {
-  try {
-    await requireAdminSession();
+  await requireAdminSession();
 
+  try {
     const folderId = req.nextUrl.searchParams.get('folderId');
     const searchTerm = req.nextUrl.searchParams.get('search');
     const limitParam = req.nextUrl.searchParams.get('limit');
@@ -65,9 +65,9 @@ export async function GET(req: NextRequest) {
  * Create a new asset from URL
  */
 export async function POST(req: NextRequest) {
-  try {
-    await requireAdminSession();
+  await requireAdminSession();
 
+  try {
     const { url, alt, width, height, folderIds } = await req.json();
 
     if (!url || typeof url !== 'string' || !url.trim()) {

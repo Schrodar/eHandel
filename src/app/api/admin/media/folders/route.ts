@@ -7,9 +7,9 @@ import { requireAdminSession } from '@/lib/adminAuth';
  * Returns all folders (optionally filtered by parentId)
  */
 export async function GET(req: NextRequest) {
-  try {
-    await requireAdminSession();
+  await requireAdminSession();
 
+  try {
     const parentId = req.nextUrl.searchParams.get('parentId') || undefined;
 
     const folders = await prisma.folder.findMany({
@@ -39,9 +39,9 @@ export async function GET(req: NextRequest) {
  * Create a new folder
  */
 export async function POST(req: NextRequest) {
-  try {
-    await requireAdminSession();
+  await requireAdminSession();
 
+  try {
     const { name, parentId } = await req.json();
 
     if (!name || typeof name !== 'string' || !name.trim()) {
