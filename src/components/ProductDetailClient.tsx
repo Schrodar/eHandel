@@ -107,10 +107,38 @@ export default function ProductDetailClient({ product }: Props) {
                   <div className="flex items-center gap-3">
                     {variants.map((variant) => {
                       const isActive = variant.id === selectedVariant?.id;
-                      const background =
-                        variant.colorHex || (variant.colorName ?? '#ffffff');
+                      const background = variant.colorHex ?? '#ffffff';
+
+                      // Determine if the color is light to choose a contrasting outline.
+                      // Simple luminance approximation from hex.
+                      function hexToRgb(hex: string) {
+                        const h = hex.replace('#', '');
+                        const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+                        const r = (bigint >> 16) & 255;
+                        const g = (bigint >> 8) & 255;
+                        const b = bigint & 255;
+                        return { r, g, b };
+                      }
+
+                      function isLightColor(hex: string) {
+                        try {
+                          const { r, g, b } = hexToRgb(hex);
+                          // Relative luminance formula
+                          const [R, G, B] = [r, g, b].map((c) => {
+                            const v = c / 255;
+                            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+                          });
+                          const L = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+                          return L > 0.6; // threshold; tweak if needed
+                        } catch {
+                          return false;
+                        }
+                      }
+
+                      const light = isLightColor(background);
+
                       return (
-                        <button
+                          <button
                           key={variant.id}
                           type="button"
                           onClick={() => {
@@ -122,13 +150,20 @@ export default function ProductDetailClient({ product }: Props) {
                           className={
                             'h-10 w-10 rounded-full flex items-center justify-center border transition-shadow ' +
                             (isActive
-                              ? 'ring-2 ring-emerald-500 border-transparent'
-                              : 'border-slate-200 bg-white')
+                              ? (light ? 'ring-2 ring-emerald-500 border-transparent bg-stone-100' : 'ring-2 ring-emerald-500 border-transparent')
+                              : (light ? 'border-slate-200 bg-stone-100' : 'border-slate-200 bg-white'))
                           }
                         >
                           <span className="sr-only">{variant.colorName}</span>
                           <div
-                            className="h-6 w-6 rounded-full"
+                            className={
+                              'h-6 w-6 rounded-full transition-colors ' +
+                              (isActive
+                                ? 'ring-2 ring-inset ring-white border border-slate-200'
+                                : light
+                                  ? 'ring-1 ring-inset ring-black/10 border border-slate-200'
+                                  : 'ring-1 ring-inset ring-white')
+                            }
                             style={{ background }}
                           />
                         </button>
@@ -137,7 +172,7 @@ export default function ProductDetailClient({ product }: Props) {
                   </div>
 
                   <div className="text-sm text-slate-600">
-                    Color: {colorLabel}
+                    {colorLabel}
                   </div>
                 </div>
 

@@ -7,6 +7,10 @@ generator client {
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
+    // Optional: uncomment and set DIRECT_URL in .env to a plain
+    // direct-connection string (port 5432, no ?pgbouncer=true).
+    // Required by `prisma migrate` when DATABASE_URL points at the pooler.
+    // directUrl = env("DIRECT_URL")
 }
 
 // Using strings for priceClass and season for initial flexible seeding

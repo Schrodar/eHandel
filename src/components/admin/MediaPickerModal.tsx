@@ -128,11 +128,12 @@ export default function MediaPickerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-lg">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+          <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <h2 className="text-lg font-semibold text-slate-900">
             Välj bilder från galleriet
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="text-slate-500 hover:text-slate-900"
           >
@@ -149,6 +150,7 @@ export default function MediaPickerModal({
             </h3>
             <div className="space-y-1 text-xs">
               <button
+                type="button"
                 onClick={() => setSelectedFolderId(null)}
                 className={`block w-full rounded px-2 py-1 text-left transition-colors ${
                   selectedFolderId === null
@@ -161,6 +163,7 @@ export default function MediaPickerModal({
               {folders.map((folder) => (
                 <button
                   key={folder.id}
+                  type="button"
                   onClick={() => setSelectedFolderId(folder.id)}
                   className={`block w-full rounded px-2 py-1 text-left transition-colors ${
                     selectedFolderId === folder.id
@@ -250,6 +253,7 @@ export default function MediaPickerModal({
                 {nextCursor && !loadingMore && (
                   <div className="mt-4 text-center">
                     <button
+                      type="button"
                       onClick={async () => {
                         setLoadingMore(true);
                         try {
@@ -300,14 +304,16 @@ export default function MediaPickerModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-slate-200 p-4">
+          <div className="flex items-center justify-end gap-2 border-t border-slate-200 p-4">
           <button
+            type="button"
             onClick={onClose}
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
           >
             Avbryt
           </button>
           <button
+            type="button"
             onClick={handleSelect}
             disabled={selectedAssetIds.size === 0 || isSubmitting}
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-slate-800"

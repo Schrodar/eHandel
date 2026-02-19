@@ -93,6 +93,66 @@ export async function getOrderById(orderId: string) {
   });
 }
 
+const ORDER_STATUS_PUBLIC_SELECT = {
+  id: true,
+  orderNumber: true,
+  orderStatus: true,
+  paymentStatus: true,
+  createdAt: true,
+  shippedAt: true,
+  customerName: true,
+  shippingCity: true,
+  shippingCountry: true,
+  shippingCarrier: true,
+  shippingTracking: true,
+  subtotal: true,
+  shipping: true,
+  discount: true,
+  total: true,
+  currency: true,
+  items: {
+    select: {
+      id: true,
+      productName: true,
+      variantName: true,
+      sku: true,
+      quantity: true,
+      unitPrice: true,
+      lineTotal: true,
+    },
+  },
+} as const;
+
+export type PublicOrder = Awaited<ReturnType<typeof getOrderByPublicToken>>;
+
+/**
+ * Fetches an order for the public order-status page.
+ *
+ * TODO: Replace the `id`-based lookup with a dedicated `publicToken` field
+ *       (a cryptographically random token, e.g. cuid2/nanoid) once a migration
+ *       adds `publicToken String @unique` to the Order model.
+ *       Until then the order cuid is used as the token (not guessable in practice,
+ *       but not as safe as a purpose-built token).
+ *
+ * Dev fallback: token "dev" (or the literal string "dev") returns the latest order.
+ */
+export async function getOrderByPublicToken(token: string) {
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (isDev && (token === 'dev' || !token)) {
+    return prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: ORDER_STATUS_PUBLIC_SELECT,
+    });
+  }
+
+  // TODO: swap `id` for `publicToken` after adding the field + migration
+  return prisma.order.findUnique({
+    where: { id: token },
+    select: ORDER_STATUS_PUBLIC_SELECT,
+  });
+}
+
 export async function generateOrderNumber(): Promise<string> {
   const year = new Date().getFullYear();
   const count = await prisma.order.count();
