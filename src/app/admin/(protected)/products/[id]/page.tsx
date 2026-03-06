@@ -14,6 +14,8 @@ import {
   updateVariant,
   setDefaultVariant,
 } from '../actions';
+import { SubmitButton } from '@/components/admin/SubmitButton';
+import { DeleteVariantButton } from '@/components/admin/DeleteVariantButton';
 
 type PageProps = {
   // In newer Next.js runtimes, these can be Promises.
@@ -748,6 +750,12 @@ export default async function AdminProductDetailPage({
                           )}
                         </div>
 
+                        {!isEditing && (
+                          <div className="mt-2 flex justify-end">
+                            <DeleteVariantButton variantId={v.id} productId={product.id} />
+                          </div>
+                        )}
+
                         {isEditing && (
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <AdminForm
@@ -833,12 +841,13 @@ export default async function AdminProductDetailPage({
                                 >
                                   Avbryt
                                 </Link>
-                                <button
-                                  type="submit"
-                                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                                {/* SubmitButton uses useFormStatus to disable on pending – prevents double-submit */}
+                                <SubmitButton
+                                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                                  pendingLabel="Sparar…"
                                 >
                                   Spara grunduppgifter
-                                </button>
+                                </SubmitButton>
                               </div>
                             </AdminForm>
                           </div>
@@ -985,6 +994,9 @@ export default async function AdminProductDetailPage({
                                     Edit
                                   </Link>
                                 )}
+                                {!isEditing && (
+                                  <DeleteVariantButton variantId={v.id} productId={product.id} />
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -992,9 +1004,12 @@ export default async function AdminProductDetailPage({
                           {isEditing && (
                             <tr className="border-b border-slate-100 last:border-0">
                               <td colSpan={8} className="px-3 py-3 bg-slate-50">
-                                <form
+                                <AdminForm
                                   action={updateVariant}
                                   className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3"
+                                  toastMessage="Sparat"
+                                  pendingMessage="Sparar…"
+                                  showOverlay={false}
                                 >
                                   <input type="hidden" name="id" value={v.id} />
                                   <input
@@ -1072,14 +1087,15 @@ export default async function AdminProductDetailPage({
                                     >
                                       Avbryt
                                     </Link>
-                                    <button
-                                      type="submit"
-                                      className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                                    {/* SubmitButton disables during pending – prevents double-save on the edit form */}
+                                    <SubmitButton
+                                      className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                                      pendingLabel="Sparar…"
                                     >
                                       Spara variant
-                                    </button>
+                                    </SubmitButton>
                                   </div>
-                                </form>
+                                </AdminForm>
                               </td>
                             </tr>
                           )}
@@ -1096,9 +1112,12 @@ export default async function AdminProductDetailPage({
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
               Skapa variant
             </h3>
-            <form
+            <AdminForm
               action={createVariant}
               className="grid gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 md:grid-cols-3"
+              toastMessage="Variant skapad"
+              pendingMessage="Skapar variant…"
+              showOverlay={false}
             >
               <input type="hidden" name="productId" value={product.id} />
               <div>
@@ -1160,14 +1179,16 @@ export default async function AdminProductDetailPage({
                 </p>
               </div>
               <div className="flex items-end justify-end md:col-span-3">
-                <button
-                  type="submit"
-                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                {/* SubmitButton disables immediately on first click – prevents
+                    double-click creating duplicate variants via ensureUniqueSku */}
+                <SubmitButton
+                  className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                  pendingLabel="Skapar…"
                 >
                   Skapa variant
-                </button>
+                </SubmitButton>
               </div>
-            </form>
+            </AdminForm>
           </div>
         </div>
       )}

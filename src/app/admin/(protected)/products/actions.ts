@@ -297,6 +297,8 @@ export async function createVariant(formData: FormData) {
   const productId = ((formData.get('productId') as string | null) || '').trim();
   if (!productId) redirect('/admin/products?error=missing-product');
 
+  console.log('[Admin] createVariant – start', { productId });
+
   const errors: Record<string, string> = {};
 
   const skuRaw = ((formData.get('sku') as string | null) || '').trim();
@@ -354,9 +356,20 @@ export async function createVariant(formData: FormData) {
     }
   }
 
-  await prisma.productVariant.create({
-    data: {
-      // använd sku som id för enkel, stabil identifierare
+  // ROOT CAUSE OF DUPLICATE BUG:
+  // The old code used prisma.create() + ensureUniqueSku(), which auto-suffixes
+  // the SKU on collision (-2, -3, …). Under double-click or browser retry each
+  // concurrent request passed the duplicate check before any row existed and
+  // produced SLUG-COLOR, SLUG-COLOR-2, SLUG-COLOR-3, … all in the DB.
+  //
+  // FIX: Replace create() with upsert() keyed on the stable SKU/id.
+  // The second (and any further) request silently no-ops (update: {}),
+  // so exactly one row is ever created regardless of how many requests land.
+  console.log('[Admin] createVariant – upsert', { sku, productId, colorId, stock, priceInCents });
+
+  await prisma.productVariant.upsert({
+    where: { id: sku },
+    create: {
       id: sku,
       productId,
       sku,
@@ -365,7 +378,12 @@ export async function createVariant(formData: FormData) {
       priceInCents: priceInCents ?? undefined,
       active: false,
     },
+    // No-op on duplicate: a second identical request re-reports success
+    // without creating an additional row.
+    update: {},
   });
+
+  console.log('[Admin] createVariant – done', { sku });
 
   revalidatePath(`/admin/products/${productId}`);
   revalidatePath('/admin/products');
@@ -382,6 +400,8 @@ export async function updateVariant(formData: FormData) {
   const id = ((formData.get('id') as string | null) || '').trim();
   const productId = ((formData.get('productId') as string | null) || '').trim();
   if (!id || !productId) redirect('/admin/products?error=missing-variant');
+
+  console.log('[Admin] updateVariant – start', { id, productId });
 
   const errors: Record<string, string> = {};
 
@@ -539,4 +559,50 @@ export async function setDefaultVariant(formData: FormData): Promise<void> {
   revalidatePath('/admin/products');
   revalidatePath('/shop');
   revalidatePath('/admin');
+}
+
+export async function deleteVariant(formData: FormData) {
+  await assertAdmin();
+
+  const id = ((formData.get('id') as string | null) || '').trim();
+  const productId = ((formData.get('productId') as string | null) || '').trim();
+  if (!id || !productId) redirect('/admin/products?error=missing-variant');
+
+  console.log('[Admin] deleteVariant – start', { id, productId });
+
+  // Verify variant exists and belongs to this product.
+  const variant = await prisma.productVariant.findUnique({
+    where: { id },
+    select: { productId: true, sku: true },
+  });
+
+  if (!variant) {
+    redirect(`/admin/products/${productId}?tab=variants&error=missing-variant`);
+  }
+
+  if (variant.productId !== productId) {
+    redirect(
+      `/admin/products/${productId}?tab=variants&error=variant-product-mismatch`,
+    );
+  }
+
+  // If this variant is set as the product's default, clear it first to avoid
+  // a FK constraint violation when the row is deleted.
+  await prisma.product.updateMany({
+    where: { id: productId, defaultVariantId: id },
+    data: { defaultVariantId: null },
+  });
+
+  // VariantImage rows are cascade-deleted by the DB (onDelete: Cascade in
+  // schema.prisma), so we only need to delete the variant itself.
+  await prisma.productVariant.delete({ where: { id } });
+
+  console.log('[Admin] deleteVariant – done', { id, sku: variant.sku });
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+  revalidatePath('/admin');
+
+  redirect(`/admin/products/${productId}?tab=variants`);
 }
