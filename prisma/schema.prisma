@@ -5,12 +5,10 @@ generator client {
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
-    // Optional: uncomment and set DIRECT_URL in .env to a plain
-    // direct-connection string (port 5432, no ?pgbouncer=true).
-    // Required by `prisma migrate` when DATABASE_URL points at the pooler.
-    // directUrl = env("DIRECT_URL")
+    provider  = "postgresql"
+    url       = env("DATABASE_URL")
+    // directUrl is used by prisma migrate / prisma db push so DDL bypasses pgbouncer
+    directUrl = env("DIRECT_URL")
 }
 
 // Using strings for priceClass and season for initial flexible seeding
@@ -90,9 +88,71 @@ model ProductVariant {
     @@index([colorId])
 }
 
-// Orders stored when customers checkout through Klarna
-enum PaymentProvider {
-    KLARNA
+
+
+// ─── Discount / Coupon system ─────────────────────────────────────────────────
+
+enum DiscountScope {
+    GLOBAL    // applies to entire cart
+    CATEGORY  // applies to items whose product.categoryId matches
+    PRODUCT   // applies to all variants of a specific product
+    VARIANT   // applies to exactly one variant
+}
+
+enum DiscountType {
+    PERCENT        // value = 1–100 (%)
+    AMOUNT         // value = öre
+    FREE_SHIPPING  // value ignored; discount = shippingCost
+}
+
+enum DiscountUsageType {
+    UNLIMITED   // e.g. campaign code FIRST10
+    SINGLE_USE  // e.g. unique printed voucher
+    MAX_USES    // shared code with a cap (maxUses)
+}
+
+/** Describes the rules of a discount campaign. One drive → many codes. */
+model DiscountDrive {
+    id            String         @id @default(cuid())
+    name          String
+    scopeType     DiscountScope
+    categoryId    String?        // set when scopeType=CATEGORY
+    productId     String?        // set when scopeType=PRODUCT
+    variantId     String?        // set when scopeType=VARIANT
+    discountType  DiscountType
+    value         Int            // PERCENT 1–100, AMOUNT öre, FREE_SHIPPING 0
+    minOrderValue Int?           // min eligible subtotal in öre
+    active        Boolean        @default(true)
+    createdAt     DateTime       @default(now())
+
+    codes DiscountCode[]
+
+    @@index([active])
+}
+
+/** A code customers type in. Points to a DiscountDrive for the actual rules. */
+model DiscountCode {
+    id        String             @id @default(cuid())
+    code      String             @unique
+    driveId   String
+    drive     DiscountDrive      @relation(fields: [driveId], references: [id], onDelete: Cascade)
+    usageType DiscountUsageType
+    maxUses   Int?               // only relevant when usageType=MAX_USES
+    usedCount Int                @default(0)
+    usedAt    DateTime?          // set on first use (SINGLE_USE)
+    createdAt DateTime           @default(now())
+
+    @@index([driveId])
+    @@index([code])
+}
+
+enum CheckoutOrderStatus {
+    CREATED
+    AUTHORIZED
+    CAPTURED
+    FULFILLED
+    CANCELLED
+    REFUNDED
 }
 
 enum PaymentStatus {
@@ -117,11 +177,16 @@ enum OrderStatus {
 model Order {
     id              String          @id @default(cuid())
     orderNumber     String          @unique // human-readable ORDER-YYYY-0001
-    paymentProvider PaymentProvider @default(KLARNA)
+    publicToken     String          @unique // random 64-char hex; required for public polling (no-PII)
+    status          CheckoutOrderStatus @default(CREATED)
+    providerOrderId String?         @unique
+    providerPaymentId String?
+    amountTotal     Int?
+    shippingAddress Json?
+    provider String @default("STRIPE")
     klarnaOrderId   String?         @unique
     paymentStatus   PaymentStatus   @default(PENDING)
     orderStatus     OrderStatus     @default(NEW)
-
     customerEmail String
     customerName  String
     customerPhone String?
@@ -142,10 +207,12 @@ model Order {
 
     subtotal Int
     shipping Int
-    discount Int
+    discount Int         // total discount in öre
     tax      Int
     total    Int
     currency String
+    appliedDiscountCode String?  // snapshot of code at time of order
+    appliedDriveId      String?  // snapshot of drive id
 
     createdAt    DateTime  @default(now())
     authorizedAt DateTime?
@@ -153,8 +220,13 @@ model Order {
     shippedAt    DateTime?
     updatedAt    DateTime  @updatedAt
 
-    items OrderItem[]
+    confirmationEmailSentAt DateTime? // Set when order confirmation email is sent; used for idempotent email dispatch
+    shippedEmailSentAt      DateTime? // Set when shipping notification email is sent; used for idempotent dispatch
 
+    items  OrderItem[]
+    events OrderEvent[]
+
+    @@index([provider, status])
     @@index([klarnaOrderId])
     @@index([paymentStatus])
     @@index([orderStatus])
@@ -172,6 +244,9 @@ model OrderItem {
     quantity    Int
     unitPrice   Int
     lineTotal   Int
+    snapshotName String?
+    snapshotUnitAmount Int?
+    snapshotImageUrl String?
 }
 
 // Media library: folder hierarchy
@@ -231,4 +306,30 @@ model VariantImage {
     @@unique([variantId, role]) // Only one primary per variant
     @@index([variantId, sortOrder])
     @@index([assetId])
+}
+
+// ─── Outbox ───────────────────────────────────────────────────────────────────
+
+enum OrderEventType {
+    ORDER_PAID
+    ORDER_SHIPPED
+}
+
+model OrderEvent {
+    id             String          @id @default(cuid())
+    type           OrderEventType
+    orderId        String
+    order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    payload        Json
+    idempotencyKey String          @unique
+    createdAt      DateTime        @default(now())
+    processedAt    DateTime?
+    attempts       Int             @default(0)
+    lastError      String?
+    lockedAt       DateTime?       // Lease-lock timestamp
+    lockedBy       String?         // Processor instance id that holds the lock
+
+    @@index([processedAt, createdAt])
+    @@index([type, processedAt])
+    @@index([orderId])
 }

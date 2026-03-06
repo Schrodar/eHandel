@@ -6,7 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { canActivateVariant } from '@/lib/mediaPolicy';
+import { canActivateVariant, type VariantWithImages } from '@/lib/mediaPolicy';
 import { revalidatePath } from 'next/cache';
 
 /**
@@ -38,7 +38,7 @@ export async function toggleVariantActive(
   });
 
   const variantWithImages = { ...variant, variantImages };
-  const { canActivate, reason } = canActivateVariant(variantWithImages as any);
+  const { canActivate, reason } = canActivateVariant(variantWithImages as VariantWithImages);
   if (!canActivate) {
     throw new Error(`Cannot activate: ${reason}`);
   }

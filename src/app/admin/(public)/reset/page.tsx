@@ -22,9 +22,9 @@ export default function AdminResetPage() {
 
     if (code) {
       // PKCE flow – exchange the code for a session
-      setMode('pkce');
       const supabase = createBrowserSupabaseClient();
       supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        setMode('pkce');
         if (error) {
           setError('Länken är ogiltig eller har gått ut. Begär en ny återställning.');
         }
@@ -37,9 +37,11 @@ export default function AdminResetPage() {
         : '';
       const params = new URLSearchParams(hash);
       const token = params.get('access_token');
-      setAccessToken(token);
-      setMode('hash');
-      setReady(true);
+      queueMicrotask(() => {
+        setAccessToken(token);
+        setMode('hash');
+        setReady(true);
+      });
     }
   }, []);
 

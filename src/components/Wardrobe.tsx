@@ -13,13 +13,16 @@ export function Wardrobe({
 }) {
   return (
     <WardrobeFilters products={products}>
-      {({ filtered }) => (
-        <div className="wardrobe-grid">
-          {filtered.map((p) => (
-            <WardrobeCard key={p.id} product={p} />
-          ))}
-        </div>
-      )}
+      {({ filtered }) => {
+        const isSingle = filtered.length === 1;
+        return (
+          <div className={isSingle ? 'wardrobe-grid wardrobe-grid--single' : 'wardrobe-grid'}>
+            {filtered.map((p) => (
+              <WardrobeCard key={p.id} product={p} />
+            ))}
+          </div>
+        );
+      }}
     </WardrobeFilters>
   );
 }

@@ -47,6 +47,8 @@ export default async function ShopPage({ searchParams }: Props) {
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <h1 className="text-2xl font-serif mb-4">Shop</h1>
 
+        
+
         {/* Client island: prefetch top products (routes + images), once per session */}
         <ShopPrefetchTopProducts products={first3} />
 

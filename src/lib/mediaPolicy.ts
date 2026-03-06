@@ -1,12 +1,12 @@
 /**
- * Central media activation policy.
- * Single source of truth for when a variant can be activated.
+ * Central policy för aktivering av media.
+ * En enda källa till sanning för när en variant får aktiveras.
  *
- * Variant.active can be true ONLY if:
- * 1. At least 1 VariantImage exists
- * 2. Exactly 1 VariantImage with role='primary' exists
+ * Variant.active får vara true ENDAST om:
+ * 1. Minst 1 VariantImage finns
+ * 2. Exakt 1 VariantImage med role='primary' finns
  * 3. Primary Asset.status === 'ready'
- * 4. Primary Asset.url is non-empty and valid http(s)
+ * 4. Primary Asset.url är icke-tom och giltig http(s)
  */
 
 type Asset = {

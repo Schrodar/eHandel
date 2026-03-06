@@ -1,26 +1,31 @@
 'use server';
 
+/**
+ * Admin order Server Actions.
+ *
+ * Pipeline: READY_TO_PICK → PICKING → PACKED → SHIPPED
+ *
+ * Rules:
+ *  - All logistics transitions guard that paymentStatus === CAPTURED.
+ *  - markShipped delegates to OrderService (creates ORDER_SHIPPED outbox event,
+ *    sends email idempotently, stores carrier + tracking).
+ *  - updateShipping calls the same service so the email is never re-sent but
+ *    carrier/tracking are updated.
+ *  - No Klarna actions – this project uses Stripe only.
+ */
+
 import { revalidatePath } from 'next/cache';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { prisma } from '@/lib/prisma';
-import {
-  cancelKlarnaAuthorization,
-  captureKlarnaPayment,
-  refundKlarnaPayment,
-} from '@/lib/klarna/client';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
-import { createTestOrder as createTestOrderRecord } from '@/lib/orders/queries';
+import { markShipped as serviceMarkShipped } from '@/lib/orders/service';
 
 export type OrderActionResult = {
   ok: boolean;
   message: string;
 };
 
-export async function createTestOrder(): Promise<void> {
-  await requireAdminSession();
-  await createTestOrderRecord();
-  revalidatePath('/admin/orders');
-}
+// ─── startPicking ─────────────────────────────────────────────────────────────
 
 export async function startPicking(
   orderId: string,
@@ -29,10 +34,14 @@ export async function startPicking(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { orderStatus: true },
+    select: { orderStatus: true, paymentStatus: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  if (order.paymentStatus !== PaymentStatus.CAPTURED) {
+    return { ok: false, message: 'Betalningen är inte bekräftad (CAPTURED)' };
+  }
 
   const startable = new Set<OrderStatus>([
     OrderStatus.NEW,
@@ -52,34 +61,7 @@ export async function startPicking(
   return { ok: true, message: 'Plockning startad' };
 }
 
-export async function undoPickingToNew(
-  orderId: string,
-): Promise<OrderActionResult> {
-  await requireAdminSession();
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { orderStatus: true },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (order.orderStatus !== OrderStatus.PICKING) {
-    return {
-      ok: false,
-      message: 'Kan inte ångra plock – status är inte PICKING',
-    };
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { orderStatus: OrderStatus.NEW },
-  });
-
-  revalidatePath(`/admin/orders/${orderId}`);
-  revalidatePath('/admin/orders');
-  return { ok: true, message: 'Plockning ångrad – order återställd till Ny' };
-}
+// ─── markPacked ───────────────────────────────────────────────────────────────
 
 export async function markPacked(orderId: string): Promise<OrderActionResult> {
   await requireAdminSession();
@@ -92,7 +74,7 @@ export async function markPacked(orderId: string): Promise<OrderActionResult> {
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
 
   if (order.orderStatus !== OrderStatus.PICKING) {
-    return { ok: false, message: 'Ordern måste vara i plockläge' };
+    return { ok: false, message: 'Ordern måste vara i plockläge (PICKING)' };
   }
 
   await prisma.order.update({
@@ -102,33 +84,19 @@ export async function markPacked(orderId: string): Promise<OrderActionResult> {
 
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath('/admin/orders');
-  return { ok: true, message: 'Plock klart' };
+  return { ok: true, message: 'Plock klart – redo att skickas' };
 }
 
-export async function undoPacked(orderId: string): Promise<OrderActionResult> {
-  await requireAdminSession();
+// ─── markShipped ──────────────────────────────────────────────────────────────
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { orderStatus: true },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (order.orderStatus !== OrderStatus.PACKED) {
-    return { ok: false, message: 'Ordern är inte packad' };
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { orderStatus: OrderStatus.PICKING },
-  });
-
-  revalidatePath(`/admin/orders/${orderId}`);
-  revalidatePath('/admin/orders');
-  return { ok: true, message: 'Ordern återställd till plock' };
-}
-
+/**
+ * Marks the order as shipped via OrderService, which:
+ *   1. Updates orderStatus=SHIPPED + carrier/tracking in a transaction.
+ *   2. Creates an ORDER_SHIPPED outbox event (idempotent via unique key).
+ *   3. Runs processOutbox() best-effort → sends shipping email exactly once.
+ *
+ * Requires orderStatus === PACKED (checked here before hitting the service).
+ */
 export async function markShipped(params: {
   orderId: string;
   carrier: string;
@@ -137,7 +105,7 @@ export async function markShipped(params: {
   await requireAdminSession();
 
   if (!params.carrier.trim() || !params.tracking.trim()) {
-    return { ok: false, message: 'Fraktbolag och tracking krävs' };
+    return { ok: false, message: 'Fraktbolag och spårningsnummer krävs' };
   }
 
   const order = await prisma.order.findUnique({
@@ -148,55 +116,35 @@ export async function markShipped(params: {
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
 
   if (order.orderStatus !== OrderStatus.PACKED) {
-    return { ok: false, message: 'Ordern måste vara packad' };
+    return {
+      ok: false,
+      message: 'Ordern måste vara packad (PACKED) för att kunna skickas',
+    };
   }
 
-  await prisma.order.update({
-    where: { id: params.orderId },
-    data: {
-      orderStatus: OrderStatus.SHIPPED,
-      shippedAt: new Date(),
-      shippingCarrier: params.carrier.trim(),
-      shippingTracking: params.tracking.trim(),
-    },
-  });
+  try {
+    await serviceMarkShipped(
+      params.orderId,
+      params.carrier.trim(),
+      params.tracking.trim(),
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Fel vid märkning som skickad';
+    return { ok: false, message: msg };
+  }
 
   revalidatePath(`/admin/orders/${params.orderId}`);
   revalidatePath('/admin/orders');
-  return { ok: true, message: 'Markerad som skickad' };
+  return { ok: true, message: 'Order markerad som skickad – leveransmejl skickas' };
 }
 
-export async function undoShipped(orderId: string): Promise<OrderActionResult> {
-  await requireAdminSession();
+// ─── updateShipping ───────────────────────────────────────────────────────────
 
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { orderStatus: true, paymentStatus: true },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (order.orderStatus !== OrderStatus.SHIPPED) {
-    return { ok: false, message: 'Ordern är inte skickad' };
-  }
-
-  if (order.paymentStatus === PaymentStatus.CAPTURED) {
-    return { ok: false, message: 'Kan inte backa skickad efter capture' };
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      orderStatus: OrderStatus.PACKED,
-      shippedAt: null,
-    },
-  });
-
-  revalidatePath(`/admin/orders/${orderId}`);
-  revalidatePath('/admin/orders');
-  return { ok: true, message: 'Ordern återställd till packad' };
-}
-
+/**
+ * Updates carrier/tracking on an already-SHIPPED order.
+ * Delegates to the same service → ORDER_SHIPPED event is NOT re-created
+ * (idempotencyKey unique constraint), so the shipping email is NOT re-sent.
+ */
 export async function updateShipping(params: {
   orderId: string;
   carrier: string;
@@ -205,7 +153,7 @@ export async function updateShipping(params: {
   await requireAdminSession();
 
   if (!params.carrier.trim() || !params.tracking.trim()) {
-    return { ok: false, message: 'Fraktbolag och tracking krävs' };
+    return { ok: false, message: 'Fraktbolag och spårningsnummer krävs' };
   }
 
   const order = await prisma.order.findUnique({
@@ -215,174 +163,29 @@ export async function updateShipping(params: {
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
 
-  const allowed = new Set<OrderStatus>([
-    OrderStatus.PACKED,
+  const updatable = new Set<OrderStatus>([
     OrderStatus.SHIPPED,
     OrderStatus.COMPLETED,
   ]);
-  if (!allowed.has(order.orderStatus)) {
-    return { ok: false, message: 'Ordern kan inte uppdatera fraktinfo' };
-  }
-
-  await prisma.order.update({
-    where: { id: params.orderId },
-    data: {
-      shippingCarrier: params.carrier.trim(),
-      shippingTracking: params.tracking.trim(),
-    },
-  });
-
-  revalidatePath(`/admin/orders/${params.orderId}`);
-  revalidatePath('/admin/orders');
-  return { ok: true, message: 'Fraktinfo uppdaterad' };
-}
-
-export async function capturePayment(
-  orderId: string,
-): Promise<OrderActionResult> {
-  await requireAdminSession();
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: {
-      paymentStatus: true,
-      orderStatus: true,
-      klarnaOrderId: true,
-      total: true,
-    },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (order.orderStatus !== OrderStatus.SHIPPED) {
-    return { ok: false, message: 'Ordern måste vara skickad' };
-  }
-
-  if (order.paymentStatus !== PaymentStatus.AUTHORIZED) {
-    return { ok: false, message: 'Betalningen är inte auktoriserad' };
-  }
-
-  if (!order.klarnaOrderId) {
-    return { ok: false, message: 'Klarna order-id saknas' };
-  }
-
-  const result = await captureKlarnaPayment({
-    klarnaOrderId: order.klarnaOrderId,
-    amount: order.total,
-  });
-
-  if (!result.ok) {
+  if (!updatable.has(order.orderStatus)) {
     return {
       ok: false,
-      message: result.error ?? 'Klarna capture misslyckades',
+      message: 'Fraktinfo kan bara uppdateras för skickade ordrar',
     };
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: PaymentStatus.CAPTURED,
-      capturedAt: new Date(),
-      orderStatus: OrderStatus.COMPLETED,
-    },
-  });
-
-  revalidatePath(`/admin/orders/${orderId}`);
-  revalidatePath('/admin/orders');
-  return {
-    ok: true,
-    message: result.mocked ? 'Klarna capture mockad' : 'Klarna capture klar',
-  };
-}
-
-export async function cancelAuthorization(
-  orderId: string,
-): Promise<OrderActionResult> {
-  await requireAdminSession();
-
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    select: { klarnaOrderId: true, paymentStatus: true, orderStatus: true },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (
-    order.orderStatus === OrderStatus.SHIPPED ||
-    order.orderStatus === OrderStatus.COMPLETED
-  ) {
-    return { ok: false, message: 'Kan inte avbryta efter skickad' };
+  try {
+    await serviceMarkShipped(
+      params.orderId,
+      params.carrier.trim(),
+      params.tracking.trim(),
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Fel vid uppdatering av fraktinfo';
+    return { ok: false, message: msg };
   }
-
-  if (order.paymentStatus !== PaymentStatus.AUTHORIZED) {
-    return { ok: false, message: 'Betalningen är inte auktoriserad' };
-  }
-  if (!order.klarnaOrderId) {
-    return { ok: false, message: 'Klarna order-id saknas' };
-  }
-
-  const result = await cancelKlarnaAuthorization({
-    klarnaOrderId: order.klarnaOrderId,
-  });
-
-  if (!result.ok) {
-    return {
-      ok: false,
-      message: result.error ?? 'Klarna cancel misslyckades',
-    };
-  }
-
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      paymentStatus: PaymentStatus.CANCELLED,
-      orderStatus: OrderStatus.CANCELLED,
-    },
-  });
-
-  revalidatePath(`/admin/orders/${orderId}`);
-  revalidatePath('/admin/orders');
-  return { ok: true, message: 'Auktorisering avbruten' };
-}
-
-export async function refundPayment(params: {
-  orderId: string;
-  amount: number;
-}): Promise<OrderActionResult> {
-  await requireAdminSession();
-
-  const order = await prisma.order.findUnique({
-    where: { id: params.orderId },
-    select: { klarnaOrderId: true, paymentStatus: true, orderStatus: true },
-  });
-
-  if (!order) return { ok: false, message: 'Ordern hittades inte' };
-
-  if (order.paymentStatus !== PaymentStatus.CAPTURED) {
-    return { ok: false, message: 'Betalningen är inte capturerad' };
-  }
-  if (!order.klarnaOrderId) {
-    return { ok: false, message: 'Klarna order-id saknas' };
-  }
-
-  const result = await refundKlarnaPayment({
-    klarnaOrderId: order.klarnaOrderId,
-    amount: params.amount,
-  });
-
-  if (!result.ok) {
-    return { ok: false, message: result.error ?? 'Klarna refund misslyckades' };
-  }
-
-  await prisma.order.update({
-    where: { id: params.orderId },
-    data: {
-      paymentStatus: PaymentStatus.REFUNDED,
-      orderStatus: OrderStatus.COMPLETED,
-    },
-  });
 
   revalidatePath(`/admin/orders/${params.orderId}`);
   revalidatePath('/admin/orders');
-  return { ok: true, message: 'Refund klar' };
+  return { ok: true, message: 'Fraktinfo uppdaterad (inget nytt mejl skickas)' };
 }

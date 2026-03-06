@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
-import { OrderStatus, PaymentProvider, PaymentStatus } from '@prisma/client';
+import { OrderStatus, PaymentStatus } from '@prisma/client';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -158,65 +158,4 @@ export async function generateOrderNumber(): Promise<string> {
   const count = await prisma.order.count();
   const num = String(count + 1).padStart(4, '0');
   return `ORDER-${year}-${num}`;
-}
-
-export async function createTestOrder() {
-  const orderNumber = await generateOrderNumber();
-
-  const subtotal = 59000;
-  const shipping = 4900;
-  const discount = 0;
-  const tax = 11800;
-  const total = subtotal + shipping - discount;
-
-  return prisma.order.create({
-    data: {
-      orderNumber,
-      paymentProvider: PaymentProvider.KLARNA,
-      paymentStatus: PaymentStatus.AUTHORIZED,
-      orderStatus: OrderStatus.READY_TO_PICK,
-      klarnaOrderId: `mock-${Date.now()}`,
-      customerEmail: 'warehouse.demo@example.com',
-      customerName: 'Demo Lager',
-      customerPhone: '0701234567',
-      shippingAddressLine1: 'Testgatan 1',
-      shippingPostalCode: '11122',
-      shippingCity: 'Stockholm',
-      shippingCountry: 'SE',
-      billingAddressLine1: 'Testgatan 1',
-      billingPostalCode: '11122',
-      billingCity: 'Stockholm',
-      billingCountry: 'SE',
-      subtotal,
-      shipping,
-      discount,
-      tax,
-      total,
-      currency: 'SEK',
-      items: {
-        create: [
-          {
-            productId: 'demo-product-1',
-            variantId: 'demo-variant-1',
-            productName: 'Testtröja',
-            variantName: 'M / Svart',
-            sku: 'SKU-DEMO-001',
-            quantity: 1,
-            unitPrice: 35000,
-            lineTotal: 35000,
-          },
-          {
-            productId: 'demo-product-2',
-            variantId: 'demo-variant-2',
-            productName: 'Testbyxor',
-            variantName: 'L / Grå',
-            sku: 'SKU-DEMO-002',
-            quantity: 1,
-            unitPrice: 24000,
-            lineTotal: 24000,
-          },
-        ],
-      },
-    },
-  });
 }

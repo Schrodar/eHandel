@@ -1,11 +1,16 @@
 import { siteConfig } from '@/lib/siteConfig';
 import { TopNav } from '@/components/TopNav';
-import { Footer } from '@/components/Footer';
+import { ContactLegalNav } from '@/components/ContactLegalNav';
 
 export default function ContactPage() {
   return (
     <div className="min-h-screen bg-[#e9aeb7] overflow-x-hidden">
       <TopNav />
+      <div className="hidden md:block">
+        <div className="mx-auto max-w-6xl px-4 sm:px-8 mt-4">
+          <ContactLegalNav variant="desktop" />
+        </div>
+      </div>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-8 py-10 sm:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
@@ -23,10 +28,12 @@ export default function ContactPage() {
             <div className="text-sm text-white/80">
               ✓ Vi svarar normalt inom 24 timmar på vardagar
             </div>
+
+            <ContactLegalNav variant="mobile" />
           </div>
 
           {/* HÖGER: kontaktkort */}
-          <div className="rounded-[32px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
+          <div className="rounded-4xl bg-white/10 shadow-xl overflow-hidden border border-white/25">
             <div className="p-6 sm:p-8 space-y-8">
               <section>
                 <h2 className="text-lg sm:text-xl font-semibold text-white mb-3">
@@ -67,8 +74,6 @@ export default function ContactPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

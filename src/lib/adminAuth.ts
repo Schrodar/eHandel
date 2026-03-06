@@ -31,6 +31,10 @@ export function isAdminEmail(email: string | undefined | null): boolean {
   return allow.has(email.toLowerCase());
 }
 
+// Supabase Factor type exposes id and status but the SDK types may not always
+// reflect the full runtime shape – we use this structural helper to narrow safely.
+export type SupabaseFactor = { id: string; status: string };
+
 export async function checkMFAStatus() {
   const supabase = await createSupabaseServerClient();
 
@@ -47,15 +51,15 @@ export async function checkMFAStatus() {
   const totpFactors = factorsData?.totp ?? [];
 
   const verifiedTotpFactors = totpFactors.filter(
-    (f) => (f as any)?.status === 'verified' || (f as any)?.status === 'verified_factor',
+    (f) => (f as SupabaseFactor).status === 'verified' || (f as SupabaseFactor).status === 'verified_factor',
   );
-  const unverifiedTotpFactors = totpFactors.filter((f) => (f as any)?.status === 'unverified');
+  const unverifiedTotpFactors = totpFactors.filter((f) => (f as SupabaseFactor).status === 'unverified');
 
   const hasVerifiedTotp = verifiedTotpFactors.length > 0;
   const hasUnverifiedTotp = unverifiedTotpFactors.length > 0;
   const hasAnyFactor = allFactors.length > 0;
   const hasAnyVerifiedFactor = allFactors.some(
-    (f) => (f as any)?.status === 'verified' || (f as any)?.status === 'verified_factor',
+    (f) => (f as SupabaseFactor).status === 'verified' || (f as SupabaseFactor).status === 'verified_factor',
   );
   const aal = aalData?.currentLevel ?? 'aal1';
 

@@ -17,6 +17,7 @@ const navItems = [
   { href: '/admin/materials', label: 'Material' },
   { href: '/admin/colors', label: 'Färger' },
   { href: '/admin/media', label: 'Bildgalleri' },
+  { href: '/admin/discounts', label: 'Rabatter' },
 ];
 
 export const dynamic = 'force-dynamic';

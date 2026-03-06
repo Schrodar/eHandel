@@ -61,6 +61,7 @@ export type CheckoutRequest = {
   // client-side totals (optional) to help display — server recalculates
   client_total_amount?: number; // öre
   client_total_tax_amount?: number; // öre
+  discountCode?: string; // applied discount code — server re-validates and re-calculates
 };
 
 /**

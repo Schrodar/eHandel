@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { assertSameOrigin } from '@/lib/security/origin';
 
 type Body = { password?: string };
 
@@ -15,7 +16,10 @@ function getIp(req: Request) {
   return req.headers.get('x-real-ip') ?? 'unknown';
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const csrfReject = assertSameOrigin(req);
+  if (csrfReject) return csrfReject;
+
   try {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;

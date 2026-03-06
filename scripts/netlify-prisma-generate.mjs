@@ -30,6 +30,6 @@ if (!shouldGenerate()) {
 // Retry once to avoid transient filesystem/network issues.
 try {
   await run(prismaBin(), ['generate']);
-} catch (e) {
+} catch {
   await run(prismaBin(), ['generate']);
 }

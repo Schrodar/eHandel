@@ -2,8 +2,6 @@ import Link from 'next/link';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { listOrders } from '@/lib/orders/queries';
 import { formatPaymentStatus, formatOrderStatus } from '@/lib/orders/formatters';
-import AdminForm from '@/components/admin/AdminForm';
-import { createTestOrder } from './actions';
 
 export const metadata = {
   title: 'Admin – Orders',
@@ -58,19 +56,20 @@ function getNextAction(order: {
   orderStatus: OrderStatus;
   paymentStatus: PaymentStatus;
 }) {
-  if (order.orderStatus === OrderStatus.NEW) return 'Starta plock';
-  if (order.orderStatus === OrderStatus.READY_TO_PICK) return 'Starta plock';
-  if (order.orderStatus === OrderStatus.PICKING) return 'Plock klart';
-  if (order.orderStatus === OrderStatus.PACKED) return 'Skicka';
+  // Guard: no logistics actions until payment is confirmed
+  if (order.paymentStatus !== PaymentStatus.CAPTURED) return 'Väntar betalning';
+
   if (
-    order.orderStatus === OrderStatus.SHIPPED &&
-    order.paymentStatus === PaymentStatus.AUTHORIZED
+    order.orderStatus === OrderStatus.NEW ||
+    order.orderStatus === OrderStatus.READY_TO_PICK
   ) {
-    return 'Capture';
+    return 'Plocka';
   }
-  if (order.orderStatus === OrderStatus.SHIPPED) return 'Avvakta capture';
+  if (order.orderStatus === OrderStatus.PICKING) return 'Packa';
+  if (order.orderStatus === OrderStatus.PACKED) return 'Skicka';
+  if (order.orderStatus === OrderStatus.SHIPPED) return 'Klart ✓';
+  if (order.orderStatus === OrderStatus.COMPLETED) return 'Klart ✓';
   if (order.orderStatus === OrderStatus.CANCELLED) return 'Avbruten';
-  if (order.orderStatus === OrderStatus.COMPLETED) return 'Klar';
   return '—';
 }
 
@@ -115,13 +114,14 @@ function buildPageHref(params: SearchParams, page: number): { href: string } {
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<SearchParams>;
 }) {
-  const paymentStatusParam = toStringParam(searchParams.paymentStatus);
-  const orderStatusParam = toStringParam(searchParams.orderStatus);
-  const query = toStringParam(searchParams.query);
-  const fromParam = toStringParam(searchParams.from);
-  const toParam = toStringParam(searchParams.to);
+  const sp = await searchParams;
+  const paymentStatusParam = toStringParam(sp.paymentStatus);
+  const orderStatusParam = toStringParam(sp.orderStatus);
+  const query = toStringParam(sp.query);
+  const fromParam = toStringParam(sp.from);
+  const toParam = toStringParam(sp.to);
 
   const paymentStatus = isPaymentStatus(paymentStatusParam)
     ? paymentStatusParam
@@ -139,7 +139,7 @@ if (from && to && from > to) {
 }
 
 
-  const page = toIntParam(searchParams.page, 1);
+  const page = toIntParam(sp.page, 1);
 
 const { orders, total, pageSize } = await listOrders({
   paymentStatus,
@@ -160,18 +160,6 @@ const { orders, total, pageSize } = await listOrders({
           <h1 className="text-2xl font-semibold text-slate-900">Ordrar</h1>
           <p className="text-sm text-slate-500">{total} ordrar totalt</p>
         </div>
-        <AdminForm
-          action={createTestOrder}
-          toastMessage="Testorder skapad"
-          pendingMessage="Skapar testorder..."
-        >
-          <button
-            type="submit"
-            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Skapa testorder
-          </button>
-        </AdminForm>
       </div>
 
       <form
@@ -293,7 +281,7 @@ const { orders, total, pageSize } = await listOrders({
         </div>
         <div className="flex gap-2">
           <Link
-            {...buildPageHref(searchParams, Math.max(1, page - 1))}
+            {...buildPageHref(sp, Math.max(1, page - 1))}
             className={`rounded-lg border px-3 py-1.5 ${
               page <= 1
                 ? 'pointer-events-none border-slate-200 text-slate-400'
@@ -303,7 +291,7 @@ const { orders, total, pageSize } = await listOrders({
             Forra
           </Link>
           <Link
-            {...buildPageHref(searchParams, Math.min(totalPages, page + 1))}
+            {...buildPageHref(sp, Math.min(totalPages, page + 1))}
             className={`rounded-lg border px-3 py-1.5 ${
               page >= totalPages
                 ? 'pointer-events-none border-slate-200 text-slate-400'

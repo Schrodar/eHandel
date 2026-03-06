@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { AdminLoginModal } from './AdminLoginModal';
@@ -15,11 +15,7 @@ export function AdminLoginEntry() {
 
   const shouldAutoOpen = adminLogin === '1' && pathname === '/';
 
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (shouldAutoOpen) setOpen(true);
-  }, [shouldAutoOpen]);
+  const [open, setOpen] = useState(() => shouldAutoOpen);
 
   const modalError = useMemo(() => {
     if (!open) return null;

@@ -108,7 +108,7 @@ export function ShopFiltersProvider({ children }: { children: React.ReactNode })
       new URLSearchParams(searchParams.toString()),
     );
 
-    setFilters((current) => (shallowEqualFilters(current, fromUrl) ? current : fromUrl));
+    queueMicrotask(() => setFilters((current) => (shallowEqualFilters(current, fromUrl) ? current : fromUrl)));
   }, [isShopRoute, searchParams]);
 
   // Sync filters -> URL (shareable links) without full navigation.

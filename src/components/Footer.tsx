@@ -2,14 +2,11 @@
 
 import Link from 'next/link';
 import { siteConfig } from '@/lib/siteConfig';
-import { useEffect, useState } from 'react';
+import React from 'react';
 
 export function Footer() {
-  const [year, setYear] = useState<number | null>(null);
-
-  useEffect(() => {
-    setYear(new Date().getFullYear());
-  }, []);
+  const year = new Date().getFullYear();
+  const phoneDigits = siteConfig.company.phone.replace(/\s+/g, '');
 
   return (
     <footer className="w-full bg-[#e9aeb7] pt-16 pb-10 mt-auto">
@@ -31,8 +28,7 @@ export function Footer() {
               <div className="text-white/70 text-sm space-y-1">
                 <p>Org.nr: {siteConfig.company.orgNumber}</p>
                 <p>
-                  {siteConfig.company.address},{' '}
-                  {siteConfig.company.zipCity}
+                  {siteConfig.company.address}, {siteConfig.company.zipCity}, {siteConfig.company.country}
                 </p>
                 <a
                   href={`mailto:${siteConfig.company.email}`}
@@ -41,6 +37,15 @@ export function Footer() {
                 >
                   {siteConfig.company.email}
                 </a>
+                <p>                 
+                  <a
+                  href={`tel:${phoneDigits}`}
+                  className="inline-block underline underline-offset-4 hover:opacity-90"
+                  style={{ color: 'var(--accent-2)' }}
+                >
+                  {siteConfig.company.phone}
+                </a>
+                </p>
               </div>
             </div>
 
@@ -78,11 +83,7 @@ export function Footer() {
 
           {/* Bottom row */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/60">
-            <p>
-              ©{' '}
-              <span suppressHydrationWarning>{year ?? ''}</span>{' '}
-              {siteConfig.company.name}. All rights reserved.
-            </p>
+            <p>© {year} {siteConfig.company.name}. All rights reserved.</p>
             <p>Built in Sweden · Fast delivery · Premium feel</p>
           </div>
         </div>

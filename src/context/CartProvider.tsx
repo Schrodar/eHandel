@@ -1,10 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useSyncExternalStore, useState } from 'react';
 import { useCart } from '../hooks/useCart';
 import { CartDrawer } from '@/components/CartDrawer';
 import { CheckoutModal } from '@/components/CheckoutModal';
-import type { CustomerInfo } from '@/components/checkout';
 
 type CartContextValue = ReturnType<typeof useCart> & {
   openCart: () => void;
@@ -13,7 +12,6 @@ type CartContextValue = ReturnType<typeof useCart> & {
   openCheckout: () => void;
   closeCheckout: () => void;
   checkoutOpen: boolean;
-  finishOrder: (customer: CustomerInfo) => void;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
@@ -22,11 +20,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const cart = useCart();
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   function openCart() {
     setCartOpen(true);
@@ -43,16 +38,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCheckoutOpen(false);
   }
 
-  function finishOrder(customer: CustomerInfo) {
-    // I produktion: skicka till server här
-    console.log('Order submitted with customer:', customer);
-    console.log('Cart items:', cart.cart);
-
-    alert('Beställning skickad (låtsas) ✅');
-    setCheckoutOpen(false);
-    cart.reset();
-  }
-
   const value: CartContextValue = {
     ...cart,
     openCart,
@@ -61,7 +46,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     openCheckout,
     closeCheckout,
     checkoutOpen,
-    finishOrder,
   };
 
   return (
@@ -74,6 +58,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           items={cart.items}
           setQty={cart.setQty}
           onCheckout={openCheckout}
+          coupon={cart.coupon}
+          onApplyCoupon={cart.applyCoupon}
+          onRemoveCoupon={cart.removeCoupon}
         />
       )}
 
@@ -81,7 +68,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         <CheckoutModal
           open={checkoutOpen}
           onClose={closeCheckout}
-          onSubmit={finishOrder}
         />
       )}
     </CartContext.Provider>

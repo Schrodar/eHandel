@@ -1,11 +1,16 @@
 import { siteConfig } from '@/lib/siteConfig';
 import { TopNav } from '@/components/TopNav';
-import { Footer } from '@/components/Footer';
+import { ContactLegalNav } from '@/components/ContactLegalNav';
 
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#e9aeb7] overflow-x-hidden">
       <TopNav />
+      <div className="hidden md:block">
+        <div className="mx-auto max-w-6xl px-4 sm:px-8 mt-4">
+          <ContactLegalNav variant="desktop" />
+        </div>
+      </div>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-8 py-10 sm:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
@@ -17,17 +22,19 @@ export default function PrivacyPage() {
 
             <p className="text-white/85 text-[15px] sm:text-lg leading-relaxed max-w-[54ch]">
               Vi värnar om din personliga integritet. Här förklarar vi hur{' '}
-              {siteConfig.company.name} samlar in, använder och skyddar dina
+              E-handeln samlar in, använder och skyddar dina
               personuppgifter.
             </p>
 
             <div className="text-sm text-white/80">
               ✓ Transparens • ✓ Säker hantering • ✓ Dina rättigheter
             </div>
+
+            <ContactLegalNav variant="mobile" />
           </div>
 
           {/* HÖGER: innehållskort */}
-          <div className="rounded-[32px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
+          <div className="rounded-4xl bg-white/10 shadow-xl overflow-hidden border border-white/25">
             <div className="p-6 sm:p-8 space-y-8">
               <section>
                 <h2 className="text-lg sm:text-xl font-semibold text-white mb-2">
@@ -88,8 +95,6 @@ export default function PrivacyPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

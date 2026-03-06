@@ -74,7 +74,7 @@ function FormFeedback({
   useEffect(() => {
     if (pending) {
       wasPendingRef.current = true;
-      setShowLocalToast(false);
+      queueMicrotask(() => setShowLocalToast(false));
       if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
       return;
     }
@@ -84,7 +84,7 @@ function FormFeedback({
       clearToastFromSession();
 
       if (toastMessage) {
-        setShowLocalToast(true);
+        queueMicrotask(() => setShowLocalToast(true));
         hideTimerRef.current = window.setTimeout(() => {
           setShowLocalToast(false);
         }, 2200);

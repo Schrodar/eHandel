@@ -26,6 +26,8 @@
 
 /* cards mimic product layout: rounded, soft bg, subtle border and shadow */
 .wardrobe-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+/* Single-product: center a card with the same max-width as a normal card */
+.wardrobe-grid--single{grid-template-columns:minmax(0,320px);justify-content:center}
 .card{background:linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.9));border:1px solid var(--card-border);padding:10px;border-radius:18px;box-shadow:var(--shadow);overflow:hidden}
 .imgWrap{height:220px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:12px;background:var(--panel);border:1px solid rgba(0,0,0,0.04)}
 .imgWrap img{max-width:92%;height:auto;display:block}
@@ -56,7 +58,7 @@
   .search-row{flex-direction:row}
   .filter-toggle{width:auto}
   .filter-grid{grid-template-columns:repeat(3,1fr)}
-  .wardrobe-grid{grid-template-columns:repeat(3,1fr)}
+  .wardrobe-grid:not(.wardrobe-grid--single){grid-template-columns:repeat(3,1fr)}
 }
 
 /* Make search input wider on desktop */

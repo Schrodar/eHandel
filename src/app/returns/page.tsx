@@ -1,11 +1,16 @@
 import { siteConfig } from '@/lib/siteConfig';
 import { TopNav } from '@/components/TopNav';
-import { Footer } from '@/components/Footer';
+import { ContactLegalNav } from '@/components/ContactLegalNav';
 
 export default function ReturnsPage() {
   return (
     <div className="min-h-screen bg-[#e9aeb7] overflow-x-hidden">
       <TopNav />
+      <div className="hidden md:block">
+        <div className="mx-auto max-w-6xl px-4 sm:px-8 mt-4">
+          <ContactLegalNav variant="desktop" />
+        </div>
+      </div>
 
       <main className="mx-auto max-w-6xl px-4 sm:px-8 py-10 sm:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-14 items-start">
@@ -23,10 +28,12 @@ export default function ReturnsPage() {
             <div className="text-sm text-white/80">
               ✓ Tydligt • ✓ Enkelt • ✓ Inga konstigheter
             </div>
+
+            <ContactLegalNav variant="mobile" />
           </div>
 
           {/* HÖGER: sammanfattning + detaljer */}
-          <div className="rounded-[32px] bg-white/10 shadow-xl overflow-hidden border border-white/25">
+          <div className="rounded-4xl bg-white/10 shadow-xl overflow-hidden border border-white/25">
             <div className="p-6 sm:p-8 space-y-8">
               {/* Sammanfattning (ersätter blå boxen) */}
               <section className="rounded-2xl bg-black/20 border border-white/15 p-5 sm:p-6">
@@ -127,8 +134,6 @@ export default function ReturnsPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

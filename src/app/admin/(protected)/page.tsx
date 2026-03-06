@@ -1,6 +1,5 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { Prisma } from '@prisma/client';
 
 export const metadata = {
   title: 'Admin – Dashboard',
@@ -160,9 +159,9 @@ export default async function AdminDashboardPage() {
   
   try {
     kpis = await getKpis();
-  } catch (err: any) {
+  } catch (err: unknown) {
     // If DATABASE_URL is placeholder or invalid, show setup UI instead of crashing
-    dbError = err?.message ?? 'Database connection failed';
+    dbError = err instanceof Error ? err.message : 'Database connection failed';
     kpis = null;
   }
   

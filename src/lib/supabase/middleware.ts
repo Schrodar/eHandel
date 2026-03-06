@@ -15,7 +15,7 @@ type CookieToSet = {
 export function createSupabaseMiddlewareClient(req: NextRequest) {
   const { url, anonKey } = getSupabaseEnv();
 
-  let res = NextResponse.next({ request: { headers: req.headers } });
+  const res = NextResponse.next({ request: { headers: req.headers } });
 
   const supabase = createServerClient(url, anonKey, {
     cookies: {

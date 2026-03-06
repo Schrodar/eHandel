@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
 import CreateFolderModal from '@/components/admin/CreateFolderModal';
 import AddAssetModal from '@/components/admin/AddAssetModal';
 
@@ -39,7 +38,6 @@ export default function MediaLibraryContent({
 }: Props) {
   const [folders, setFolders] = useState(initialFolders);
   const [assets, setAssets] = useState(initialAssets);
-  const [loading, setLoading] = useState(false);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showAddAsset, setShowAddAsset] = useState(false);
   const [currentFolder, setCurrentFolder] = useState<string | undefined>(
@@ -53,7 +51,7 @@ export default function MediaLibraryContent({
     setFolders((prev) => [...prev, newFolder]);
   };
 
-  const handleAddAsset = async (newAsset: any) => {
+  const handleAddAsset = async (newAsset: AssetWithFolders) => {
     const assetWithFolders: AssetWithFolders = {
       ...newAsset,
       folders: newAsset.folders || [],
@@ -97,8 +95,8 @@ export default function MediaLibraryContent({
 
   const filteredAssets = currentFolder
     ? assets.filter((asset) =>
-        (asset.folders as any[])?.some(
-          (af: any) => af.folderId === currentFolder,
+        asset.folders.some(
+          (af) => af.folderId === currentFolder,
         ),
       )
     : assets;
@@ -132,8 +130,8 @@ export default function MediaLibraryContent({
             </button>
             {folders.map((folder) => {
               const folderAssetCount = assets.filter((asset) =>
-                (asset.folders as any[])?.some(
-                  (af: any) => af.folderId === folder.id,
+                asset.folders.some(
+                  (af) => af.folderId === folder.id,
                 ),
               ).length;
 

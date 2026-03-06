@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireAdminSession } from '@/lib/adminAuth';
-import { canActivateVariant } from '@/lib/mediaPolicy';
+import { canActivateVariant, type VariantWithImages } from '@/lib/mediaPolicy';
 
 async function assertAdmin() {
   // Server actions should be protected even if the UI is protected.
@@ -236,7 +236,7 @@ export async function publishProduct(formData: FormData) {
   const hasReadyVariants =
     activeVariants.length > 0 &&
     activeVariants.every((v) => {
-      const { canActivate } = canActivateVariant(v as any);
+      const { canActivate } = canActivateVariant(v as VariantWithImages);
       return v.sku && v.stock >= 0 && canActivate && v.priceInCents != null;
     });
 
@@ -484,7 +484,7 @@ export async function toggleVariantActive(formData: FormData) {
         `/admin/products/${productId}?tab=variants&error=stock-negative`,
       );
     }
-    const { canActivate } = canActivateVariant(variant as any);
+    const { canActivate } = canActivateVariant(variant as VariantWithImages);
     if (!canActivate) {
       redirect(
         `/admin/products/${productId}?tab=variants&error=activation-blocked`,

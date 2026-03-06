@@ -25,13 +25,32 @@ export type CartItem = {
 
 export type CartState = Record<string, CartItem>; // key: SKU
 
+/**
+ * Applied discount — result of a successful /api/discounts/validate call.
+ * discountAmount is in öre and has already been capped to eligibleSubtotal on the server.
+ */
+export type AppliedDiscount = {
+  code: string;
+  driveId: string;
+  driveName: string;
+  discountAmount: number;         // öre
+  shippingDiscountAmount: number; // öre
+  eligibleSubtotal: number;       // öre
+  appliedToHint: { kind: string; label: string; shopLink?: string };
+};
+
+/** @deprecated use AppliedDiscount */
+export type AppliedCoupon = AppliedDiscount;
+
 const STORAGE_KEY = "cart:v1";
+const COUPON_STORAGE_KEY = "cart:discount:v1";
 
 export function useCart() {
   // Viktigt för att undvika hydration mismatch:
   // första render ska matcha servern => börja alltid med tom vagn.
   const [cart, setCart] = useState<CartState>({});
   const [hydrated, setHydrated] = useState(false);
+  const [coupon, setCoupon] = useState<AppliedDiscount | null>(null);
 
   // Läs in sparad vagn efter mount (endast i browsern)
   useEffect(() => {
@@ -51,6 +70,20 @@ export function useCart() {
     }
   }, []);
 
+  // Läs in sparad kupong efter mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(COUPON_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as AppliedDiscount;
+        if (parsed?.code) setCoupon(parsed);
+      }
+    } catch {
+      // ignorera
+    }
+  }, []);
+
   // Skriv tillbaka till localStorage när cart ändras (endast i browsern)
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -61,6 +94,21 @@ export function useCart() {
       // ignorera
     }
   }, [cart, hydrated]);
+
+  // Persist coupon state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!hydrated) return;
+    try {
+      if (coupon) {
+        window.localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(coupon));
+      } else {
+        window.localStorage.removeItem(COUPON_STORAGE_KEY);
+      }
+    } catch {
+      // ignorera
+    }
+  }, [coupon, hydrated]);
 
   const items = useMemo(
     () => Object.values(cart).filter((i) => i.quantity > 0),
@@ -125,8 +173,17 @@ export function useCart() {
 
   function reset() {
     setCart({});
+    setCoupon(null);
   }
 
-  return { cart, items, totalQty, add, setQty, remove, reset } as const;
+  function applyCoupon(data: AppliedDiscount) {
+    setCoupon(data);
+  }
+
+  function removeCoupon() {
+    setCoupon(null);
+  }
+
+  return { cart, items, totalQty, add, setQty, remove, reset, coupon, applyCoupon, removeCoupon } as const;
 }
       

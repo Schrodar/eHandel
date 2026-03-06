@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 
 type Folder = {
   id: string;
@@ -10,9 +11,22 @@ type Folder = {
   updatedAt: Date;
 };
 
+export type UploadedAsset = {
+  id: string;
+  url: string;
+  alt: string | null;
+  width: number | null;
+  height: number | null;
+  createdAt: Date;
+  status: string;
+  type: string;
+  updatedAt: Date;
+  folders: { folderId: string }[];
+};
+
 type Props = {
   onClose: () => void;
-  onSuccess: (asset: any) => void;
+  onSuccess: (asset: UploadedAsset) => void;
   folders: Folder[];
   selectedFolderId?: string;
 };
@@ -144,10 +158,13 @@ export default function AddAssetModal({
               {file ? (
                 <div className="space-y-2">
                   <div className="mx-auto h-16 w-16">
-                    <img
+                    <Image
                       src={URL.createObjectURL(file)}
                       alt="Preview"
+                      width={64}
+                      height={64}
                       className="h-full w-full rounded object-cover"
+                      unoptimized
                     />
                   </div>
                   <p className="text-sm font-medium text-slate-900">

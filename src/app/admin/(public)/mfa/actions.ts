@@ -9,6 +9,7 @@ import {
   requireAdminSession,
   unenrollMFAFactor,
   verifyMFA,
+  type SupabaseFactor,
 } from '@/lib/adminAuth';
 
 type SetupCookie = {
@@ -87,7 +88,7 @@ export async function startEnrollAction() {
     // but QR/secret was lost), try cleaning them up so we can enroll a fresh TOTP.
     if (status.hasAnyFactor && !status.hasAnyVerifiedFactor && status.aal !== 'aal2') {
       const factorIds = (status.allFactors ?? [])
-        .map((f) => (f as any)?.id as string | undefined)
+        .map((f) => (f as SupabaseFactor).id)
         .filter((id): id is string => Boolean(id));
 
       await Promise.all(
@@ -110,9 +111,12 @@ export async function startEnrollAction() {
   } catch (err: unknown) {
     const code =
       typeof err === 'object' && err !== null && 'code' in err
-        ? (err as any).code
-        : typeof err === 'object' && err !== null && 'cause' in err && (err as any).cause
-          ? (err as any).cause.code
+        ? (err as { code: unknown }).code
+        : typeof err === 'object' && err !== null && 'cause' in err &&
+            typeof (err as { cause: unknown }).cause === 'object' &&
+            (err as { cause: unknown }).cause !== null &&
+            'code' in ((err as { cause: unknown }).cause as object)
+          ? ((err as { cause: { code: unknown } }).cause).code
           : undefined;
     if (code === 'insufficient_aal') {
       redirect('/admin/mfa?error=aal2-required');
@@ -161,7 +165,7 @@ export async function verifyMfaAction(formData: FormData) {
   const status = await checkMFAStatus();
 
   // Prefer ongoing setup cookie; otherwise use the first existing TOTP factor.
-  const verifiedId = (status.totpFactors ?? []).find((f) => (f as any)?.status === 'verified')?.id;
+  const verifiedId = (status.totpFactors ?? []).find((f) => (f as SupabaseFactor).status === 'verified')?.id;
   const factorId = cookie?.factorId ?? verifiedId ?? status.totpFactors[0]?.id;
   if (!factorId) {
     redirect('/admin/mfa?error=no-factor');

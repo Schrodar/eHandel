@@ -16,6 +16,36 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Stripe Checkout (Card + Swish)
+
+Copy `.env.example` to `.env` and set at minimum:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `NEXT_PUBLIC_SITE_URL`
+- `STRIPE_SUCCESS_URL` (optional override)
+- `STRIPE_CANCEL_URL` (optional override)
+
+### Enable Swish in Stripe Dashboard
+
+1. Open Stripe Dashboard → **Settings** → **Payment methods**.
+2. Enable **Swish** for your account.
+3. Ensure your Checkout Session uses currency `SEK` and your account country is eligible.
+
+### Webhook setup
+
+Use endpoint:
+
+- `https://<your-domain>/api/webhooks/stripe`
+
+Local development with Stripe CLI:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+Copy the returned signing secret (`whsec_...`) into `STRIPE_WEBHOOK_SECRET`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

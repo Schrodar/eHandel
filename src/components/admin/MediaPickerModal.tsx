@@ -96,7 +96,6 @@ export default function MediaPickerModal({
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSelect = async () => {

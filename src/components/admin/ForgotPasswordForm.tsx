@@ -32,8 +32,8 @@ export function ForgotPasswordForm({ compact }: { compact?: boolean }) {
       }
 
       setStatus('sent');
-    } catch (err: any) {
-      setError(err?.message ?? String(err));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
       setStatus('error');
     }
   }

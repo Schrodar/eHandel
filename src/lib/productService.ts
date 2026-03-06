@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Season, WardrobeProduct } from '@/lib/wardrobeApi';
 import type { Prisma } from '@prisma/client';
-import { getPrimaryImage } from '@/lib/mediaPolicy';
+import { getPrimaryImage, type VariantWithImages } from '@/lib/mediaPolicy';
 
 // Storefront types for product + variants
 export type StorefrontVariant = {
@@ -48,11 +48,6 @@ type DbProductWithRelations = Prisma.ProductGetPayload<{
     };
   };
 }>;
-
-function jsonArrayOfStrings(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === 'string');
-}
 
 function jsonObjectOrNull(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return null;
@@ -108,7 +103,7 @@ function mapDbProductToWardrobe(
   // Priority 1: defaultVariant primary image
   let image = '';
   if (product.defaultVariant) {
-    const primaryImage = getPrimaryImage(product.defaultVariant as any);
+    const primaryImage = getPrimaryImage(product.defaultVariant as VariantWithImages);
     if (primaryImage?.url) {
       image = primaryImage.url;
     }
@@ -118,7 +113,7 @@ function mapDbProductToWardrobe(
   if (!image) {
     for (const variant of product.variants) {
       if (variant.active) {
-        const primaryImage = getPrimaryImage(variant as any);
+        const primaryImage = getPrimaryImage(variant as VariantWithImages);
         if (primaryImage?.url) {
           image = primaryImage.url;
           break;
@@ -131,7 +126,7 @@ function mapDbProductToWardrobe(
   if (!image) {
     const firstVariant = product.variants?.[0];
     if (firstVariant) {
-      const primaryImage = getPrimaryImage(firstVariant as any);
+      const primaryImage = getPrimaryImage(firstVariant as VariantWithImages);
       if (primaryImage?.url) {
         image = primaryImage.url;
       }

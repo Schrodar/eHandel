@@ -3,17 +3,14 @@
 
 import { MotionConfig, motion } from 'framer-motion';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import { useCartContext } from '@/context/CartProvider';
 
 export function TopNav() {
   const { totalQty, openCart } = useCartContext();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
   const displayQty = mounted ? totalQty : 0;
 

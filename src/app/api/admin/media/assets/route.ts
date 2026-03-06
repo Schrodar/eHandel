@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
+import type { Prisma } from '@prisma/client';
+import { assertSameOrigin } from '@/lib/security/origin';
 
 /**
  * GET /api/admin/media/assets
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
     const limit = limitParam ? parseInt(limitParam, 10) : 60;
     const take = Math.min(limit, 100); // Max 100 items per request
 
-    const where: any = {};
+    const where: Prisma.AssetWhereInput = {};
 
     if (folderId) {
       where.folders = {
@@ -66,6 +68,9 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   await requireAdminSession();
+
+  const csrfReject = assertSameOrigin(req);
+  if (csrfReject) return csrfReject;
 
   try {
     const { url, alt, width, height, folderIds } = await req.json();
@@ -150,6 +155,9 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     await requireAdminSession();
+
+    const csrfReject = assertSameOrigin(req);
+    if (csrfReject) return csrfReject;
 
     const assetId = req.nextUrl.searchParams.get('id');
     if (!assetId) {

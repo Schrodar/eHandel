@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
           },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
           { key: 'Cross-Origin-Resource-Policy', value: 'same-site' },
+          {
+            key: 'Content-Security-Policy',
+            value:
+              "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' https: data:; script-src 'self' 'unsafe-inline' https://js.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; connect-src 'self' https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; worker-src blob:; manifest-src 'self'",
+          },
         ],
       },
       {

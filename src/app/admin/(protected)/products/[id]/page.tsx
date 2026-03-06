@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Fragment } from 'react';
 import AdminForm from '@/components/admin/AdminForm';
 import VariantMediaSection from '@/components/admin/VariantMediaSection';
-import { canActivateVariant, getPrimaryImage } from '@/lib/mediaPolicy';
+import { canActivateVariant, getPrimaryImage, type VariantWithImages } from '@/lib/mediaPolicy';
 import {
   createVariant,
   deleteProduct,
@@ -130,7 +130,7 @@ export default async function AdminProductDetailPage({
         v.sku &&
         v.stock >= 0 &&
         v.priceInCents != null &&
-        canActivateVariant(v as any).canActivate,
+        canActivateVariant(v as VariantWithImages).canActivate,
     );
 
   return (
@@ -610,7 +610,7 @@ export default async function AdminProductDetailPage({
             <>
               <div className="space-y-3 md:hidden">
                 {product.variants.map((v) => {
-                  const primaryImage = getPrimaryImage(v as any);
+                  const primaryImage = getPrimaryImage(v as VariantWithImages);
                   const previewUrl =
                     primaryImage?.url || v.variantImages[0]?.asset.url || null;
                   const hasImages = v.variantImages.length > 0;
@@ -865,7 +865,7 @@ export default async function AdminProductDetailPage({
                   </thead>
                   <tbody>
                     {product.variants.map((v) => {
-                      const primaryImage = getPrimaryImage(v as any);
+                      const primaryImage = getPrimaryImage(v as VariantWithImages);
                       const previewUrl =
                         primaryImage?.url ||
                         v.variantImages[0]?.asset.url ||

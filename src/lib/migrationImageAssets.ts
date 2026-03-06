@@ -74,7 +74,7 @@ export async function migrateImagesToAssets() {
             sortOrder: i,
           },
         });
-      } catch (err) {
+      } catch {
         // Might already exist, skip
         console.log(
           `    ⚠ VariantImage already exists for ${variant.id} + ${assetId}`,

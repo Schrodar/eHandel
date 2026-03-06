@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
 import AdminForm from '@/components/admin/AdminForm';
-import { getProductCardImage } from '@/lib/productCardImage';
+import { getProductCardImage, type ProductForCardImage } from '@/lib/productCardImage';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -543,7 +543,7 @@ export default async function AdminProductsPage({
                   const activeCount = stats?.activeCount ?? 0;
                   const minActiveStock = stats?.minActiveStock ?? null;
                   const hasProblem = p.published && activeCount === 0;
-                  const imageUrl = getProductCardImage(p as any);
+                  const imageUrl = getProductCardImage(p as ProductForCardImage);
 
                   return (
                     <tr

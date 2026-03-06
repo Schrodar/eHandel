@@ -1,25 +1,51 @@
 // app/components/CheckoutModal.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { CustomerInfo } from './checkout';
 import { validateCheckoutRequest, createCheckoutRequest } from './checkout';
 import { useCartContext } from '@/context/CartProvider';
 import { formatPrice } from './products';
 import type { CartItem } from '@/hooks/useCart';
+import { checkoutPaymentMethods } from '@/lib/payments/providers';
+import { PAYMENT_PROVIDERS, type PaymentProviderCode } from '@/lib/payments/types';
+import { StripeCardPayment } from './StripeCardPayment';
+import { MobileCouponBox } from '@/components/cart/MobileCouponBox';
+import { CouponInput } from '@/components/cart/CouponInput';
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (customer: CustomerInfo) => void;
 };
 
-export function CheckoutModal({ open, onClose, onSubmit }: Props) {
-  const { cart, items } = useCartContext();
+export function CheckoutModal({ open, onClose }: Props) {
+  const { cart, items, reset: clearCart, coupon, applyCoupon, removeCoupon } = useCartContext();
   const [formData, setFormData] = useState<Partial<CustomerInfo>>({
     country: 'SE', // Låst till Sverige
   });
   const [errors, setErrors] = useState<string[]>([]);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderCode>(
+    PAYMENT_PROVIDERS.STRIPE,
+  );
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderPublicToken, setOrderPublicToken] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const checkoutRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll to payment section once it is mounted in the DOM
+  useEffect(() => {
+    if (showPaymentForm) {
+      // Double rAF: first frame = React commits DOM, second frame = browser has painted
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          checkoutRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+    }
+  }, [showPaymentForm]);
 
   if (!open) return null;
 
@@ -56,8 +82,9 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
     { totalInclVatOre: 0, totalExVatOre: 0, totalVatOre: 0, lineItems: [] },
   );
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting) return;
 
     // Skapa customer object
     const customer: CustomerInfo = {
@@ -73,6 +100,9 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
     // Skapa checkout request
     const checkoutRequest = createCheckoutRequest(cart, customer);
+    if (coupon?.code) {
+      checkoutRequest.discountCode = coupon.code;
+    }
 
     // Validera
     const validation = validateCheckoutRequest(checkoutRequest);
@@ -83,13 +113,58 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
     // Rensa errors och fortsätt
     setErrors([]);
+    setCheckoutError(null);
 
-    // I produktion: skicka checkoutRequest till server
-    console.log('Checkout Request:', checkoutRequest);
-    console.log('Order Total (öre):', orderTotal.totalInclVatOre);
+    try {
+      setSubmitting(true);
 
-    // Skicka vidare till parent
-    onSubmit(customer);
+      // For Stripe: use embedded payment (create order, then show payment form)
+      if (selectedProvider === PAYMENT_PROVIDERS.STRIPE) {
+        const response = await fetch('/api/checkout/create-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(checkoutRequest),
+        });
+
+        const data = (await response.json()) as { orderId?: string; publicToken?: string; error?: string };
+
+        if (!response.ok || !data.orderId) {
+          throw new Error(data.error || 'Kunde inte skapa order.');
+        }
+
+        setOrderId(data.orderId);
+        setOrderPublicToken(data.publicToken ?? null);
+        setShowPaymentForm(true);
+        setSubmitting(false);
+        return;
+      }
+
+      // For Klarna: use existing redirect flow
+      const endpoint = '/api/checkout/klarna';
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkoutRequest),
+      });
+
+      const data = (await response.json()) as { url?: string; error?: string };
+
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || 'Kunde inte starta betalningen.');
+      }
+
+      window.location.assign(data.url);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Något gick fel vid checkout.';
+      setCheckoutError(message);
+      setSubmitting(false);
+    }
   }
 
   function updateField(field: keyof CustomerInfo, value: string) {
@@ -125,13 +200,49 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-slate-300 flex justify-between">
-            <span className="font-semibold text-slate-900">
-              Totalt (inkl. moms)
-            </span>
-            <span className="font-bold text-slate-900">
-              {formatPrice(orderTotal.totalInclVatOre)}
-            </span>
+          <div className="mt-3 pt-3 border-t border-slate-300 space-y-1">
+            {/* Discount row */}
+            {coupon && (() => {
+              const saving = coupon.discountAmount + coupon.shippingDiscountAmount;
+              return (
+                <div className="flex justify-between text-sm text-emerald-700">
+                  <span>Rabatt ({coupon.code})</span>
+                  <span className="font-semibold">−{formatPrice(saving)}</span>
+                </div>
+              );
+            })()}
+            {/* Total row */}
+            <div className="flex justify-between pt-1">
+              <span className="font-semibold text-slate-900">
+                Totalt (inkl. moms)
+              </span>
+              <span className="font-bold text-slate-900">
+                {coupon
+                  ? formatPrice(Math.max(0, orderTotal.totalInclVatOre - coupon.discountAmount - coupon.shippingDiscountAmount))
+                  : formatPrice(orderTotal.totalInclVatOre)}
+              </span>
+            </div>
+          </div>
+
+          {/* Coupon — mobile accordion */}
+          <div className="mt-3 pt-3 border-t border-slate-200 md:hidden">
+            <MobileCouponBox
+              items={items}
+              appliedDiscount={coupon}
+              onApply={applyCoupon}
+              onRemove={removeCoupon}
+            />
+          </div>
+
+          {/* Coupon — desktop inline */}
+          <div className="mt-3 pt-3 border-t border-slate-200 hidden md:block">
+            <p className="text-xs text-slate-500 mb-1.5">Har du en rabattkod?</p>
+            <CouponInput
+              items={items}
+              appliedDiscount={coupon}
+              onApply={applyCoupon}
+              onRemove={removeCoupon}
+            />
           </div>
         </div>
 
@@ -146,7 +257,63 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
           </div>
         )}
 
+        {checkoutError && (
+          <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200">
+            <p className="text-sm font-semibold text-red-900">Checkout-fel:</p>
+            <p className="mt-1 text-sm text-red-700">{checkoutError}</p>
+          </div>
+        )}
+
+        <fieldset className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <legend className="text-sm font-semibold text-slate-700 px-1">
+            Välj betalningsmetod
+          </legend>
+
+          <div className="mt-2 space-y-2">
+            {checkoutPaymentMethods.map((method) => {
+              const disabled = !method.enabled || submitting;
+              const active = selectedProvider === method.code;
+
+              return (
+                <label
+                  key={method.code}
+                  className={[
+                    'flex items-start gap-3 rounded-xl border p-3 transition',
+                    active ? 'border-slate-700 bg-white' : 'border-slate-200 bg-white/80',
+                    disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+                  ].join(' ')}
+                >
+                  <input
+                    type="radio"
+                    name="payment-provider"
+                    value={method.code}
+                    checked={active}
+                    disabled={disabled}
+                    onChange={() => setSelectedProvider(method.code)}
+                    className="mt-1"
+                  />
+
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-900">
+                      {method.label}
+                    </span>
+                    <span className="text-xs text-slate-600">
+                      {method.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs font-bold text-white">
+              1
+            </span>
+            <span className="text-sm font-semibold text-slate-700">Dina uppgifter</span>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               className="rounded-2xl border border-slate-300 p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -232,15 +399,59 @@ export function CheckoutModal({ open, onClose, onSubmit }: Props) {
 
           <button
             type="submit"
-            className="w-full rounded-full py-3 font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition"
+            disabled={submitting || showPaymentForm}
+            className="w-full rounded-full py-3.5 font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
-            Slutför beställning
+            {submitting
+              ? 'Skapar order…'
+              : showPaymentForm
+                ? '\u2713 Uppgifter sparade'
+                : selectedProvider === PAYMENT_PROVIDERS.STRIPE
+                  ? 'Fortsätt till betalning →'
+                  : 'Betala med Klarna'}
           </button>
 
           <p className="text-xs text-center text-slate-500">
             * = obligatoriskt fält
           </p>
         </form>
+
+        {/* ── Steg 2: Betalning (animeras in) ── */}
+        <AnimatePresence>
+          {showPaymentForm && orderId && (
+            <motion.div
+              ref={checkoutRef}
+              key="payment"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm"
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+                  2
+                </span>
+                <h4 className="text-sm font-semibold text-slate-800">
+                  Slutför betalning
+                </h4>
+              </div>
+              <StripeCardPayment
+                orderId={orderId}
+                publicToken={orderPublicToken ?? ''}
+                onSuccess={() => {
+                  clearCart();
+                  // Redirect happens via stripe.confirmPayment return_url
+                }}
+                onError={(error) => {
+                  setCheckoutError(error);
+                  setShowPaymentForm(false);
+                  setOrderId(null);
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

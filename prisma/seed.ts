@@ -1,5 +1,5 @@
 // prisma/seed.ts
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, DiscountScope, DiscountType, DiscountUsageType } from '@prisma/client';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -238,6 +238,51 @@ async function main() {
         active,
       },
     });
+  }
+
+  // 6) seed discount drives + codes (upsert by name / code — idempotent re-runs)
+  const seedDrives = [
+    {
+      name: 'Välkommen 10%',
+      scopeType: DiscountScope.GLOBAL,
+      discountType: DiscountType.PERCENT,
+      value: 10,
+      codes: [
+        { code: 'WELCOME10', usageType: DiscountUsageType.UNLIMITED },
+      ],
+    },
+    {
+      name: 'Spara 50 kr',
+      scopeType: DiscountScope.GLOBAL,
+      discountType: DiscountType.AMOUNT,
+      value: 5000, // öre
+      codes: [
+        { code: 'SAVE50', usageType: DiscountUsageType.UNLIMITED },
+      ],
+    },
+  ];
+
+  for (const d of seedDrives) {
+    let drive = await prisma.discountDrive.findFirst({ where: { name: d.name } });
+    if (!drive) {
+      drive = await prisma.discountDrive.create({
+        data: {
+          name: d.name,
+          scopeType: d.scopeType,
+          discountType: d.discountType,
+          value: d.value,
+          active: true,
+        },
+      });
+    }
+    for (const c of d.codes) {
+      const existing = await prisma.discountCode.findUnique({ where: { code: c.code } });
+      if (!existing) {
+        await prisma.discountCode.create({
+          data: { code: c.code, driveId: drive.id, usageType: c.usageType },
+        });
+      }
+    }
   }
 
   console.log('Seed complete');

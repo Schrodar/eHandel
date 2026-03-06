@@ -93,9 +93,9 @@ export default async function OrderDetailPage({
               </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-              <div className="text-xs uppercase text-slate-500">Klarna ID</div>
+              <div className="text-xs uppercase text-slate-500">Betalning via</div>
               <div className="font-semibold text-slate-900">
-                {order.klarnaOrderId ?? '—'}
+                {order.provider ?? '—'}
               </div>
             </div>
           </div>

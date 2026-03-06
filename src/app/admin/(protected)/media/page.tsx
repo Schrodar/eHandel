@@ -39,9 +39,9 @@ export default async function MediaLibraryPage({ searchParams }: PageProps) {
   });
 
   // Transform för client (JSON-seriliserbar)
-  const assets = assetsRaw.map((asset: any) => ({
+  const assets = assetsRaw.map((asset) => ({
     ...asset,
-    folders: asset.folders.map((f: any) => ({ folderId: f.folderId })) as any,
+    folders: asset.folders.map((f) => ({ folderId: f.folderId })),
   }));
 
   return (
