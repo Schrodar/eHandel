@@ -55,64 +55,67 @@ export default async function AdminProductDetailPage({
   const needsCategoryMaterialLists = tab === 'overview';
   const needsColorList = tab === 'variants';
 
-  const product = await prisma.product.findFirst({
-    where: {
-      OR: [{ id }, { slug: id }],
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      description: true,
-      categoryId: true,
-      materialId: true,
-      priceInCents: true,
-      priceClass: true,
-      season: true,
-      attributes: true,
-      published: true,
-      defaultVariantId: true,
-      variants: {
-        select: {
-          id: true,
-          sku: true,
-          colorId: true,
-          color: { select: { id: true, name: true, hex: true } },
-          priceInCents: true,
-          stock: true,
-          active: true,
-          variantImages: {
-            include: { asset: true },
-            orderBy: { sortOrder: 'asc' },
-          },
-        },
-        orderBy: { sku: 'asc' },
+  // PERF: run product query + all lookup lists in parallel (was: 4 sequential awaits)
+  const [product, categories, materials, colors] = await Promise.all([
+    prisma.product.findFirst({
+      where: {
+        OR: [{ id }, { slug: id }],
       },
-    },
-  });
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+        categoryId: true,
+        materialId: true,
+        priceInCents: true,
+        priceClass: true,
+        season: true,
+        attributes: true,
+        published: true,
+        defaultVariantId: true,
+        variants: {
+          select: {
+            id: true,
+            sku: true,
+            colorId: true,
+            color: { select: { id: true, name: true, hex: true } },
+            priceInCents: true,
+            stock: true,
+            active: true,
+            variantImages: {
+              include: { asset: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { sku: 'asc' },
+        },
+      },
+    }),
 
-  const categories: Array<{ id: string; name: string }> =
+    // Only fetch when the overview tab is active
     needsCategoryMaterialLists
-      ? await prisma.category.findMany({
+      ? prisma.category.findMany({
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         })
-      : [];
+      : Promise.resolve([] as Array<{ id: string; name: string }>),
 
-  const materials: Array<{ id: string; name: string }> =
     needsCategoryMaterialLists
-      ? await prisma.material.findMany({
+      ? prisma.material.findMany({
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         })
-      : [];
+      : Promise.resolve([] as Array<{ id: string; name: string }>),
 
-  const colors: Array<{ id: string; name: string }> = needsColorList
-    ? await prisma.color.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      })
-    : [];
+    // Only fetch when the variants tab is active
+    needsColorList
+      ? prisma.color.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([] as Array<{ id: string; name: string }>),
+  ]);
 
   if (!product) {
     notFound();

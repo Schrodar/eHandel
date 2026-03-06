@@ -11,11 +11,14 @@ async function getKpis() {
   const LOW_STOCK_THRESHOLD = 3;
   const LIMIT = 50;
 
+  // PERF: was 8-query transaction + 1 separate round-trip to look up product names.
+  // Now: 7-query transaction. The old groupBy (no product names) + extra findMany
+  // for names has been replaced by a single findMany of activeVariants WITH product.name.
+  // lowStockVariantCount and lowStockProducts are derived in JS from the same data.
   const [
     publishedCount,
     draftCount,
-    lowStockVariantCount,
-    activeVariantAgg,
+    activeVariants,
     publishedNoActiveVariants,
     negativeStockVariants,
     negativePriceVariants,
@@ -23,15 +26,16 @@ async function getKpis() {
   ] = await prisma.$transaction([
     prisma.product.count({ where: { published: true } }),
     prisma.product.count({ where: { published: false } }),
-    prisma.productVariant.count({
-      where: { active: true, stock: { lt: LOW_STOCK_THRESHOLD } },
-    }),
-    prisma.productVariant.groupBy({
-      by: ['productId'],
+    // Previously: groupBy (productId + _min stock) with no names → required a second
+    // findMany for product names. Now one query returns all needed data.
+    prisma.productVariant.findMany({
       where: { active: true },
+      select: {
+        productId: true,
+        stock: true,
+        product: { select: { name: true } },
+      },
       orderBy: { productId: 'asc' },
-      _count: { _all: true },
-      _min: { stock: true },
     }),
     prisma.product.findMany({
       where: { published: true, variants: { none: { active: true } } },
@@ -68,40 +72,35 @@ async function getKpis() {
     }),
   ]);
 
-  const lowStockAgg = activeVariantAgg
-    .map((row) => ({
-      productId: row.productId,
-      minStock: row._min?.stock ?? null,
-    }))
-    .filter(
-      (row) => (row.minStock ?? Number.POSITIVE_INFINITY) < LOW_STOCK_THRESHOLD,
-    )
-    .map((row) => ({
-      productId: row.productId,
-      minStock: row.minStock ?? 0,
-    }));
+  // Aggregate active-variant data in JS: group by productId, pick min stock per product.
+  const productStockMap = new Map<string, { name: string; minStock: number }>();
+  for (const v of activeVariants) {
+    const existing = productStockMap.get(v.productId);
+    if (existing) {
+      existing.minStock = Math.min(existing.minStock, v.stock);
+    } else {
+      productStockMap.set(v.productId, {
+        name: v.product.name,
+        minStock: v.stock,
+      });
+    }
+  }
 
-  const lowStockProductIds = lowStockAgg.map((r) => r.productId);
-  const lowStockProductNames =
-    lowStockProductIds.length === 0
-      ? []
-      : await prisma.product.findMany({
-          where: { id: { in: lowStockProductIds } },
-          select: { id: true, name: true },
-        });
-  const nameById = new Map(
-    lowStockProductNames.map((p) => [p.id, p.name] as const),
-  );
+  // Derived: count individual active variant rows with stock below threshold.
+  const lowStockVariantCount = activeVariants.filter(
+    (v) => v.stock < LOW_STOCK_THRESHOLD,
+  ).length;
 
   const lowStockProducts: {
     productId: string;
     productName: string;
     minStock: number;
-  }[] = lowStockAgg
-    .map((row) => ({
-      productId: row.productId,
-      productName: nameById.get(row.productId) ?? row.productId,
-      minStock: row.minStock,
+  }[] = [...productStockMap.entries()]
+    .filter(([, { minStock }]) => minStock < LOW_STOCK_THRESHOLD)
+    .map(([productId, { name, minStock }]) => ({
+      productId,
+      productName: name,
+      minStock,
     }))
     .slice(0, LIMIT);
 

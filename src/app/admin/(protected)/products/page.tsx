@@ -34,6 +34,8 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
+// PERF: lean image select — only the primary image url is needed for card thumbnails.
+// Previously this loaded all Asset fields (8 cols) for every image of every variant.
 type ProductRow = Prisma.ProductGetPayload<{
   select: {
     id: true;
@@ -45,13 +47,17 @@ type ProductRow = Prisma.ProductGetPayload<{
     material: { select: { id: true; name: true } };
     _count: { select: { variants: true } };
     defaultVariant: {
-      select: { variantImages: { include: { asset: true } } };
+      select: {
+        variantImages: {
+          select: { role: true; asset: { select: { url: true } } };
+        };
+      };
     };
     variants: {
       select: {
+        active: true;
         variantImages: {
-          include: { asset: true };
-          orderBy: { sortOrder: 'asc' };
+          select: { role: true; asset: { select: { url: true } } };
         };
       };
     };
@@ -276,14 +282,25 @@ export default async function AdminProductsPage({
         category: { select: { id: true, name: true } },
         material: { select: { id: true, name: true } },
         _count: { select: { variants: true } },
+        // PERF: select only role + url for the primary image per variant.
+        // Previously: include: { asset: true } fetched all 8 asset cols for every image of every variant.
+        // Now: where: {role:'primary'} + take:1 limits to at most 1 row per variant, with only url.
         defaultVariant: {
-          select: { variantImages: { include: { asset: true } } },
+          select: {
+            variantImages: {
+              select: { role: true, asset: { select: { url: true } } },
+              where: { role: 'primary' },
+              take: 1,
+            },
+          },
         },
         variants: {
           select: {
+            active: true,
             variantImages: {
-              include: { asset: true },
-              orderBy: { sortOrder: 'asc' },
+              select: { role: true, asset: { select: { url: true } } },
+              where: { role: 'primary' },
+              take: 1,
             },
           },
         },
