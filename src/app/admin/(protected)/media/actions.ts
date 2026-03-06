@@ -1,8 +1,8 @@
-'use server';
+﻿'use server';
 
 /**
- * Server Actions för variant media operations.
- * Kan anropas från client-komponenter.
+ * Server Actions fÃ¶r variant media operations.
+ * Kan anropas frÃ¥n client-komponenter.
  */
 
 import { prisma } from '@/lib/prisma';
@@ -53,35 +53,39 @@ export async function toggleVariantActive(
 }
 
 /**
- * Add an image to a variant.
+ * Set (replace) the single image for a variant.
+ *
+ * AffÃ¤rsregel: en variant har exakt 0 eller 1 bild (role='primary').
+ *
+ * ROOT CAUSE FIX: det gamla flÃ¶det kallade create() utan att kontrollera om
+ * en rad redan existerade, vilket orsakade P2002 pÃ¥ bÃ¥de (variantId, role)
+ * och (variantId, assetId)-constraints.
+ *
+ * LÃ¶sning: atomisk transaktion med deleteMany + create.
+ *  - Om ingen rad finns: create skapar den.
+ *  - Om samma assetId finns: delete + re-create med rÃ¤tt data.
+ *  - Om annan assetId finns: delete gammal, create ny.
+ *  - Dubbel submit: andra anropet hittar 0 rader efter delete, create skapar 1 rad. OK.
  */
-export async function addVariantImageAction(
+export async function setVariantImageAction(
   variantId: string,
   assetId: string,
-  setPrimary?: boolean,
 ) {
-  if (setPrimary) {
-    await prisma.variantImage.updateMany({
-      where: { variantId, role: 'primary' },
-      data: { role: 'secondary' },
-    });
-  }
-
-  await prisma.variantImage.create({
-    data: {
-      variantId,
-      assetId,
-      role: setPrimary ? 'primary' : 'secondary',
-      sortOrder: 0,
-    },
-  });
+  await prisma.$transaction([
+    // Ta bort befintlig bild (0 eller 1 rad) â€“ fÃ¶rhindrar bÃ¥da P2002-constraints
+    prisma.variantImage.deleteMany({ where: { variantId } }),
+    // Skapa ny enda bild som primary
+    prisma.variantImage.create({
+      data: { variantId, assetId, role: 'primary', sortOrder: 0 },
+    }),
+  ]);
 
   revalidatePath('/admin/products');
   return { success: true };
 }
 
 /**
- * Remove an image from a variant.
+ * Remove the image from a variant.
  */
 export async function removeVariantImageAction(
   variantId: string,
@@ -97,41 +101,34 @@ export async function removeVariantImageAction(
   return { success: true };
 }
 
-/**
- * Set a specific image as primary.
- */
+// ---------------------------------------------------------------------------
+// Legacy actions kept for backward compatibility (no longer called from UI).
+// ---------------------------------------------------------------------------
+
+/** @deprecated Use setVariantImageAction instead. */
+export async function addVariantImageAction(
+  variantId: string,
+  assetId: string,
+  setPrimary?: boolean,
+) {
+  return setVariantImageAction(variantId, assetId);
+}
+
+/** @deprecated No longer needed â€“ every variant has at most one (primary) image. */
 export async function setVariantImagePrimaryAction(
   variantId: string,
   assetId: string,
 ) {
-  await prisma.variantImage.updateMany({
-    where: { variantId, role: 'primary' },
-    data: { role: 'secondary' },
-  });
-
-  await prisma.variantImage.update({
-    where: { variantId_assetId: { variantId, assetId } },
-    data: { role: 'primary' },
-  });
-
+  // No-op: the single VariantImage row is always role='primary'.
   revalidatePath('/admin/products');
   return { success: true };
 }
 
-/**
- * Reorder images in a variant.
- */
+/** @deprecated No longer needed â€“ reordering requires multiple images. */
 export async function reorderVariantImagesAction(
   variantId: string,
   assetIds: string[],
 ) {
-  for (let i = 0; i < assetIds.length; i++) {
-    await prisma.variantImage.update({
-      where: { variantId_assetId: { variantId, assetId: assetIds[i]! } },
-      data: { sortOrder: i },
-    });
-  }
-
-  revalidatePath('/admin/products');
+  // No-op for backward compat.
   return { success: true };
 }

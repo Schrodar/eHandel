@@ -1,8 +1,25 @@
-'use client';
+﻿'use client';
+
+/**
+ * VariantMediaSection â€“ affÃ¤rsregel: exakt 0 eller 1 bild per variant.
+ *
+ * Tidigare bug: flÃ¶det anropade addVariantImageAction() (create) flera gÃ¥nger
+ * och hanterade inte att raden kanske redan existerade, vilket orsakade P2002
+ * pÃ¥ bÃ¥de (variantId, role) och (variantId, assetId)-constraints.
+ *
+ * Fix: setVariantImageAction() kÃ¶r deleteMany+create i transaktion sÃ¥ det
+ * aldrig kan bli duplikat. UI visar bara Ã©n bild â€“ inget multi-select.
+ */
 
 import { useState } from 'react';
-import { getActivationStatus, getPrimaryImage } from '@/lib/mediaPolicy';
+import { getPrimaryImage, getActivationStatus } from '@/lib/mediaPolicy';
 import ActivationStatusBanner from './ActivationStatusBanner';
+import {
+  toggleVariantActive,
+  setVariantImageAction,
+  removeVariantImageAction,
+} from '@/app/admin/(protected)/media/actions';
+import MediaPickerModal from './MediaPickerModal';
 
 type Asset = {
   id: string;
@@ -24,14 +41,6 @@ type VariantImage = {
   asset: Asset;
   createdAt: Date;
 };
-import {
-  toggleVariantActive,
-  addVariantImageAction,
-  removeVariantImageAction,
-  setVariantImagePrimaryAction,
-  reorderVariantImagesAction,
-} from '@/app/admin/(protected)/media/actions';
-import MediaPickerModal from './MediaPickerModal';
 
 type VariantWithImages = {
   id: string;
@@ -49,24 +58,20 @@ type Props = {
 export default function VariantMediaSection({ variant, onSuccess }: Props) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoadingToggle, setIsLoadingToggle] = useState(false);
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const primaryImage = getPrimaryImage(variant);
   const activationStatus = getActivationStatus(variant);
   const isActivating = isLoadingToggle && !variant.active;
-  const sortedImages = [...(variant.variantImages || [])].sort(
-    (a, b) => a.sortOrder - b.sortOrder,
-  );
 
   const handleToggleActive = async () => {
     if (activationStatus.status === 'blocked') {
       setError(`Kan inte aktivera: ${activationStatus.reason}`);
       return;
     }
-
     setIsLoadingToggle(true);
     setError(null);
-
     try {
       await toggleVariantActive(variant.id, !variant.active);
       onSuccess?.();
@@ -77,61 +82,38 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
     }
   };
 
+  /**
+   * Called by MediaPickerModal with an array of selected assetIds.
+   * We only use the first one (maxSelect=1 in the picker, so itâ€™s always length 1).
+   * setVariantImageAction atomically replaces any existing image.
+   */
+  const handlePickerSelect = async (assetIds: string[]) => {
+    const assetId = assetIds[0];
+    if (!assetId) return;
+
+    // Guard against double-submit from rapid clicks
+    if (isSavingImage) return;
+    setIsSavingImage(true);
+    setError(null);
+
+    try {
+      await setVariantImageAction(variant.id, assetId);
+      setIsPickerOpen(false);
+      onSuccess?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunde inte spara bild');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
   const handleRemoveImage = async (assetId: string) => {
+    setError(null);
     try {
       await removeVariantImageAction(variant.id, assetId);
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kunde inte ta bort bild');
-    }
-  };
-
-  const handleSetPrimary = async (assetId: string) => {
-    try {
-      await setVariantImagePrimaryAction(variant.id, assetId);
-      onSuccess?.();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Kunde inte sätta som primär',
-      );
-    }
-  };
-
-  const handleReorderImages = async (newOrder: string[]) => {
-    try {
-      await reorderVariantImagesAction(variant.id, newOrder);
-      onSuccess?.();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Kunde inte sortera bilder',
-      );
-    }
-  };
-
-  const handlePickerSelect = async (assetIds: string[]) => {
-    try {
-      // Lägg till varje bild
-      for (const assetId of assetIds) {
-        // Kontrollera om den redan finns
-        if (!sortedImages.find((vi) => vi.assetId === assetId)) {
-          await addVariantImageAction(variant.id, assetId);
-        }
-      }
-
-      // Om varianten inte har primary och nu läggs två till, sätt första som primary
-      if (!primaryImage && assetIds.length > 0) {
-        const firstNewAsset = assetIds[0];
-        if (firstNewAsset) {
-          await setVariantImagePrimaryAction(variant.id, firstNewAsset);
-        }
-      }
-
-      setIsPickerOpen(false);
-      onSuccess?.();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Kunde inte lägga till bilder',
-      );
     }
   };
 
@@ -148,112 +130,55 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
         </div>
       )}
 
-      {/* Image grid */}
-      {sortedImages.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            Bilder ({sortedImages.length})
-          </h3>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {sortedImages.map((variantImage, idx) => (
-              <div
-                key={variantImage.assetId}
-                className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
-              >
-                {/* Image preview */}
-                <div className="aspect-square overflow-hidden bg-slate-100">
-                  {variantImage.asset.url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={variantImage.asset.url}
-                      alt={variantImage.asset.alt || 'Variant image'}
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                </div>
-
-                {/* Badge: Primary */}
-                {variantImage.role === 'primary' && (
-                  <div className="absolute right-2 top-2 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-semibold text-white">
-                    PRIMARY
-                  </div>
-                )}
-
-                {/* Hover actions */}
-                <div className="absolute bottom-0 left-0 right-0 translate-y-full space-y-1 bg-linear-to-t from-slate-900 to-transparent p-2 text-xs transition-transform group-hover:translate-y-0">
-                  {variantImage.role !== 'primary' && (
-                    <button
-                      type="button"
-                      onClick={() => handleSetPrimary(variantImage.assetId)}
-                      className="block w-full rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-800"
-                    >
-                      Sätt som primär
-                    </button>
-                  )}
-                  {sortedImages.length > 1 && (
-                    <>
-                      {idx > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newOrder = sortedImages.map(
-                              (img) => img.assetId,
-                            );
-                            [newOrder[idx], newOrder[idx - 1]] = [
-                              newOrder[idx - 1],
-                              newOrder[idx],
-                            ];
-                            handleReorderImages(newOrder);
-                          }}
-                          className="block w-full rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-800"
-                        >
-                          ↑ Upp
-                        </button>
-                      )}
-                      {idx < sortedImages.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newOrder = sortedImages.map(
-                              (img) => img.assetId,
-                            );
-                            [newOrder[idx], newOrder[idx + 1]] = [
-                              newOrder[idx + 1],
-                              newOrder[idx],
-                            ];
-                            handleReorderImages(newOrder);
-                          }}
-                          className="block w-full rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-800"
-                        >
-                          ↓ Ner
-                        </button>
-                      )}
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(variantImage.assetId)}
-                    className="block w-full rounded bg-rose-600 px-2 py-1 text-white hover:bg-rose-700"
-                  >
-                    Ta bort
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* Single image preview */}
+      {primaryImage ? (
+        <div className="flex items-start gap-4">
+          <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={primaryImage.url}
+              alt={primaryImage.alt ?? 'Variantbild'}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              PrimÃ¤rbild
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsPickerOpen(true)}
+              disabled={isSavingImage}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              ErsÃ¤tt bild
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRemoveImage(primaryImage.id)}
+              disabled={isSavingImage}
+              className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+            >
+              Ta bort bild
+            </button>
           </div>
         </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-[10px] text-slate-400">
+            Ingen bild
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsPickerOpen(true)}
+            disabled={isSavingImage}
+            className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            {isSavingImage ? 'Spararâ€¦' : 'VÃ¤lj bild'}
+          </button>
+        </div>
       )}
-
-      {/* Add image buttons */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setIsPickerOpen(true)}
-          className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
-        >
-          Välj från bildgalleri
-        </button>
-      </div>
 
       {/* Active toggle */}
       <div className="flex items-center gap-3 border-t border-slate-200 pt-4">
@@ -261,10 +186,16 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
         <button
           type="button"
           onClick={handleToggleActive}
-          disabled={isLoadingToggle || activationStatus.status === 'blocked'}
+          disabled={
+            isLoadingToggle || activationStatus.status === 'blocked'
+          }
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
             variant.active ? 'bg-emerald-600' : 'bg-slate-300'
-          } ${activationStatus.status === 'blocked' ? 'opacity-50 cursor-not-allowed' : ''}`}
+          } ${
+            activationStatus.status === 'blocked'
+              ? 'cursor-not-allowed opacity-50'
+              : ''
+          }`}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -281,17 +212,17 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
               className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
               aria-hidden="true"
             />
-            Aktiverar…
+            Aktiverarâ€¦
           </span>
         )}
       </div>
 
-      {/* Media picker modal */}
+      {/* Media picker â€“ maxSelect=1 means one click confirms immediately */}
       {isPickerOpen && (
         <MediaPickerModal
           onSelect={handlePickerSelect}
           onClose={() => setIsPickerOpen(false)}
-          excludeAssetIds={sortedImages.map((vi) => vi.assetId)}
+          maxSelect={1}
         />
       )}
     </div>

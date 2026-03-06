@@ -27,12 +27,19 @@ type Props = {
   onSelect: (assetIds: string[]) => Promise<void>;
   onClose: () => void;
   excludeAssetIds?: string[];
+  /**
+   * Maximum number of images that can be selected.
+   * When maxSelect=1 clicking an image immediately confirms selection
+   * (no checkbox multi-select, no "Lägg till"-button needed).
+   */
+  maxSelect?: number;
 };
 
 export default function MediaPickerModal({
   onSelect,
   onClose,
   excludeAssetIds = [],
+  maxSelect,
 }: Props) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [assets, setAssets] = useState<AssetWithFolders[]>([]);
@@ -129,7 +136,7 @@ export default function MediaPickerModal({
         {/* Header */}
           <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <h2 className="text-lg font-semibold text-slate-900">
-            Välj bilder från galleriet
+            {maxSelect === 1 ? 'Välj en bild' : 'Välj bilder från galleriet'}
           </h2>
           <button
             type="button"
@@ -214,7 +221,24 @@ export default function MediaPickerModal({
               <>
                 <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
                   {filteredAssets.map((asset) => (
-                    <label key={asset.id} className="group cursor-pointer">
+                    // maxSelect=1: clicking anywhere on the tile immediately confirms.
+                    // maxSelect>1 or undefined: checkbox multi-select as before.
+                    <label
+                      key={asset.id}
+                      className="group cursor-pointer"
+                      onClick={
+                        maxSelect === 1
+                          ? (e) => {
+                              e.preventDefault();
+                              if (isSubmitting) return;
+                              setIsSubmitting(true);
+                              onSelect([asset.id]).finally(() =>
+                                setIsSubmitting(false),
+                              );
+                            }
+                          : undefined
+                      }
+                    >
                       <div className="relative overflow-hidden rounded-lg border-2 border-slate-200 bg-slate-50 transition-colors group-hover:border-slate-900">
                         <div className="aspect-square">
                           {asset.url && (
@@ -230,6 +254,7 @@ export default function MediaPickerModal({
                           type="checkbox"
                           checked={selectedAssetIds.has(asset.id)}
                           onChange={(e) => {
+                            if (maxSelect === 1) return; // handled by tile onClick
                             const newSelected = new Set(selectedAssetIds);
                             if (e.target.checked) {
                               newSelected.add(asset.id);
@@ -238,7 +263,9 @@ export default function MediaPickerModal({
                             }
                             setSelectedAssetIds(newSelected);
                           }}
-                          className="absolute right-2 top-2 h-4 w-4 cursor-pointer"
+                          className={`absolute right-2 top-2 h-4 w-4 cursor-pointer ${
+                            maxSelect === 1 ? 'hidden' : ''
+                          }`}
                         />
                         {selectedAssetIds.has(asset.id) && (
                           <div className="absolute inset-0 bg-slate-900/20" />
@@ -314,8 +341,10 @@ export default function MediaPickerModal({
           <button
             type="button"
             onClick={handleSelect}
-            disabled={selectedAssetIds.size === 0 || isSubmitting}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-slate-800"
+            disabled={selectedAssetIds.size === 0 || isSubmitting || maxSelect === 1}
+            className={`rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-slate-800 ${
+              maxSelect === 1 ? 'hidden' : ''
+            }`}
           >
             Lägg till ({selectedAssetIds.size})
           </button>
