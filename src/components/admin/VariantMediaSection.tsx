@@ -53,6 +53,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
 
   const primaryImage = getPrimaryImage(variant);
   const activationStatus = getActivationStatus(variant);
+  const isActivating = isLoadingToggle && !variant.active;
   const sortedImages = [...(variant.variantImages || [])].sort(
     (a, b) => a.sortOrder - b.sortOrder,
   );
@@ -274,6 +275,15 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
         <span className="text-xs text-slate-600">
           {variant.active ? 'Aktiv' : 'Inaktiv'}
         </span>
+        {isActivating && (
+          <span className="inline-flex items-center gap-2 text-xs text-slate-600">
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+              aria-hidden="true"
+            />
+            Aktiverar…
+          </span>
+        )}
       </div>
 
       {/* Media picker modal */}

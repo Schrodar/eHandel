@@ -7,7 +7,8 @@
  * - ✓ Primary bild är ready
  * - ✓ Primary har giltig URL
  *
- * Om alla villkor är uppfyllda → grön banner
+ * Om varianten är aktiv och alla villkor är uppfyllda → grön banner
+ * Om alla villkor är uppfyllda men varianten är inaktiv → gul banner
  * Om något saknas → röd banner med lista av blockeringar
  */
 
@@ -57,7 +58,7 @@ export default function ActivationStatusBanner({ variant }: Props) {
     : false;
   const hasPrice = variant.priceInCents != null;
 
-  if (canActivate) {
+  if (canActivate && variant.active) {
     return (
       <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
@@ -68,9 +69,44 @@ export default function ActivationStatusBanner({ variant }: Props) {
               clipRule="evenodd"
             />
           </svg>
-          Redo att aktiveras
+          Aktiv
         </div>
         <ul className="mt-2 space-y-1 text-xs text-emerald-800">
+          <li className="flex items-center gap-1">
+            <span className="text-emerald-600">✓</span> Minst 1 bild
+          </li>
+          <li className="flex items-center gap-1">
+            <span className="text-emerald-600">✓</span> Exakt 1 primär bild
+          </li>
+          <li className="flex items-center gap-1">
+            <span className="text-emerald-600">✓</span> Primär bild är klar
+          </li>
+          <li className="flex items-center gap-1">
+            <span className="text-emerald-600">✓</span> Primär bild har giltig
+            URL
+          </li>
+          <li className="flex items-center gap-1">
+            <span className="text-emerald-600">✓</span> Pris är satt
+          </li>
+        </ul>
+      </div>
+    );
+  }
+
+  if (canActivate && !variant.active) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+          <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l6.518 11.591c.75 1.334-.213 2.99-1.742 2.99H3.48c-1.53 0-2.492-1.656-1.743-2.99L8.257 3.1zM11 13a1 1 0 10-2 0 1 1 0 002 0zm-1-7a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+          Är ej aktiv
+        </div>
+        <ul className="mt-2 space-y-1 text-xs text-amber-800">
           <li className="flex items-center gap-1">
             <span className="text-emerald-600">✓</span> Minst 1 bild
           </li>
