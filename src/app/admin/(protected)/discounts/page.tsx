@@ -32,6 +32,7 @@ export default async function AdminDiscountsPage() {
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { codes: true } },
+      codes: { select: { usageType: true } },
     },
   });
 
@@ -76,7 +77,7 @@ export default async function AdminDiscountsPage() {
                     {SCOPE_LABELS[d.scopeType] ?? d.scopeType}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-slate-700">
-                    {d._count.codes}
+                    {d.codes.some((c) => c.usageType === 'UNLIMITED') ? '∞' : d._count.codes}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
