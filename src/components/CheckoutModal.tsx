@@ -90,7 +90,7 @@ export function CheckoutModal({ open, onClose }: Props) {
     // Skapa customer object
     const customer: CustomerInfo = {
       email: formData.email || '',
-      phone: formData.phone,
+      phone: formData.phone || '',
       firstName: formData.firstName || '',
       lastName: formData.lastName || '',
       streetAddress: formData.streetAddress || '',
