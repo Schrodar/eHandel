@@ -135,6 +135,7 @@ export default async function ProductPage({ params }: Props) {
                 colorId: null,
                 colorName: fallback!.color,
                 colorHex: null,
+                size: null,
                 images: [fallback!.image],
                 priceInCents: Math.round(fallback!.price * 100),
                 stock: 10,

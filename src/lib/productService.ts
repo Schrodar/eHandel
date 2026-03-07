@@ -10,6 +10,7 @@ export type StorefrontVariant = {
   colorId: string | null;
   colorName: string | null;
   colorHex: string | null;
+  size: string | null; // optional size label, e.g. "S", "M", "L"
   images: string[];
   priceInCents: number; // price in öre, Klarna-ready
   stock: number;
@@ -181,6 +182,7 @@ function mapDbProductToStorefront(
         colorId: v.color?.id ?? v.colorId ?? null,
         colorName: v.color?.name ?? null,
         colorHex: v.color?.hex ?? null,
+        size: v.size ?? null,
         images,
         priceInCents,
         stock:

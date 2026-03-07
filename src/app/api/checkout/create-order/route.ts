@@ -152,7 +152,7 @@ export async function POST(req: Request) {
         productId: variant.product.id,
         variantId: variant.id,
         productName: variant.product.name,
-        variantName: variant.color?.name ?? item.variantLabel ?? null,
+        variantName: [variant.color?.name, variant.size].filter(Boolean).join(' / ') || item.variantLabel || null,
         sku: variant.sku,
         quantity,
         unitPrice: unitAmount,

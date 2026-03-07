@@ -189,7 +189,7 @@ export async function POST(req: Request) {
           currency: 'sek',
           unit_amount: unitAmount,
           product_data: {
-            name: `${variant.product.name}${variant.color?.name ? ` – ${variant.color.name}` : ''}`,
+            name: `${variant.product.name}${[variant.color?.name, variant.size].filter(Boolean).length ? ` – ${[variant.color?.name, variant.size].filter(Boolean).join(' / ')}` : ''}`,
             images: image ? [image] : undefined,
             metadata: {
               productId: variant.product.id,
@@ -204,7 +204,7 @@ export async function POST(req: Request) {
         productId: variant.product.id,
         variantId: variant.id,
         productName: variant.product.name,
-        variantName: variant.color?.name ?? item.variantLabel ?? null,
+        variantName: [variant.color?.name, variant.size].filter(Boolean).join(' / ') || item.variantLabel || null,
         sku: variant.sku,
         quantity,
         unitPrice: unitAmount,

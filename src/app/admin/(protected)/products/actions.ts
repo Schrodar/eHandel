@@ -6,6 +6,126 @@ import { redirect } from 'next/navigation';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { canActivateVariant, type VariantWithImages } from '@/lib/mediaPolicy';
 
+// ─── Bulk size variant creation ───────────────────────────────────────────────
+
+export type BulkCreateSizeVariantsResult = {
+  created: number;
+  skipped: number;
+  errors: string[];
+};
+
+export async function bulkCreateSizeVariants(
+  templateVariantId: string,
+  productId: string,
+  entries: Array<{ size: string; stock: number }>,
+): Promise<BulkCreateSizeVariantsResult> {
+  await requireAdminSession();
+
+  const result: BulkCreateSizeVariantsResult = { created: 0, skipped: 0, errors: [] };
+
+  if (!templateVariantId || !productId || !entries.length) {
+    result.errors.push('Ogiltiga parametrar.');
+    return result;
+  }
+
+  // Load template variant to inherit color/price/active/images
+  const template = await prisma.productVariant.findUnique({
+    where: { id: templateVariantId },
+    include: {
+      product: { select: { id: true, slug: true } },
+      variantImages: { select: { assetId: true, role: true, sortOrder: true } },
+    },
+  });
+
+  if (!template || template.productId !== productId) {
+    result.errors.push('Mallvarianten hittades inte.');
+    return result;
+  }
+
+  // Derive base SKU prefix from template SKU (strip any existing -size suffix)
+  // e.g.  "TSHIRT-BLACK" → base; "TSHIRT-BLACK-S" → use as-is prefix
+  const templateSkuBase = template.sku.toUpperCase().replace(/-+$/, '');
+
+  for (const entry of entries) {
+    const size = entry.size.trim();
+    if (!size) continue;
+
+    const stock = Math.max(0, Math.floor(entry.stock ?? 0));
+
+    // Dubblettskydd: skip if same product + color + size already exists
+    const existing = await prisma.productVariant.findFirst({
+      where: {
+        productId,
+        colorId: template.colorId,
+        size,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      result.skipped++;
+      continue;
+    }
+
+    // Build unique SKU e.g. TSHIRT-BLACK-S
+    const sizePart = size.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const baseSku = `${templateSkuBase}-${sizePart}`;
+    let sku = baseSku;
+
+    // Ensure uniqueness in case of SKU collision
+    const skuTaken = await prisma.productVariant.findUnique({ where: { sku }, select: { sku: true } });
+    if (skuTaken) {
+      // Try with numeric suffix
+      for (let i = 2; i <= 50; i++) {
+        const candidate = `${baseSku}-${i}`;
+        const taken = await prisma.productVariant.findUnique({ where: { sku: candidate }, select: { sku: true } });
+        if (!taken) { sku = candidate; break; }
+      }
+    }
+
+    try {
+      await prisma.productVariant.upsert({
+        where: { id: sku },
+        create: {
+          id: sku,
+          productId,
+          sku,
+          colorId: template.colorId ?? undefined,
+          size,
+          stock,
+          priceInCents: template.priceInCents ?? undefined,
+          active: false, // always start inactive; admin activates manually
+        },
+        update: {},
+      });
+
+      // Copy images from the template variant (role + sortOrder preserved)
+      if (template.variantImages.length > 0) {
+        for (const img of template.variantImages) {
+          await prisma.variantImage.create({
+            data: {
+              variantId: sku,
+              assetId: img.assetId,
+              role: img.role,
+              sortOrder: img.sortOrder,
+            },
+          });
+        }
+      }
+
+      result.created++;
+    } catch (err) {
+      result.errors.push(`Kunde inte skapa storlek ${size}: ${String(err)}`);
+    }
+  }
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/admin');
+
+  return result;
+}
+
 async function assertAdmin() {
   // Server actions should be protected even if the UI is protected.
   await requireAdminSession();
@@ -304,6 +424,8 @@ export async function createVariant(formData: FormData) {
   const skuRaw = ((formData.get('sku') as string | null) || '').trim();
   const colorId =
     ((formData.get('colorId') as string | null) || '').trim() || null;
+  const sizeRaw = ((formData.get('size') as string | null) || '').trim();
+  const size = sizeRaw || null; // normalize empty string to null
   const stockRaw = (formData.get('stock') as string | null) ?? '0';
   const priceOverrideSekRaw =
     (formData.get('priceOverrideSek') as string | null) ?? null;
@@ -374,6 +496,7 @@ export async function createVariant(formData: FormData) {
       productId,
       sku,
       colorId: colorId || undefined,
+      size: size ?? undefined,
       stock,
       priceInCents: priceInCents ?? undefined,
       active: false,
@@ -408,6 +531,8 @@ export async function updateVariant(formData: FormData) {
   const sku = ((formData.get('sku') as string | null) || '').trim();
   const colorId =
     ((formData.get('colorId') as string | null) || '').trim() || null;
+  const sizeRaw = ((formData.get('size') as string | null) || '').trim();
+  const size = sizeRaw || null; // normalize empty string to null
   const stockRaw = (formData.get('stock') as string | null) ?? '0';
   const priceOverrideSekRaw =
     (formData.get('priceOverrideSek') as string | null) ?? null;
@@ -456,6 +581,7 @@ export async function updateVariant(formData: FormData) {
     data: {
       sku,
       colorId: colorId || undefined,
+      size: size,
       stock,
       priceInCents: priceInCents ?? null,
     },

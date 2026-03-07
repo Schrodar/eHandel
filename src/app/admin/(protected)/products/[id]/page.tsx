@@ -16,6 +16,7 @@ import {
 } from '../actions';
 import { SubmitButton } from '@/components/admin/SubmitButton';
 import { DeleteVariantButton } from '@/components/admin/DeleteVariantButton';
+import { BulkSizeVariantsButton } from '@/components/admin/BulkSizeVariantsButton';
 
 type PageProps = {
   // In newer Next.js runtimes, these can be Promises.
@@ -80,6 +81,7 @@ export default async function AdminProductDetailPage({
             sku: true,
             colorId: true,
             color: { select: { id: true, name: true, hex: true } },
+            size: true,
             priceInCents: true,
             stock: true,
             active: true,
@@ -677,7 +679,7 @@ export default async function AdminProductDetailPage({
                                 </span>
                               </div>
                               <div className="mt-0.5 truncate text-xs text-slate-600">
-                                {v.color?.name ?? '–'} · Stock {v.stock} ·{' '}
+                                {v.color?.name ?? '–'}{v.size ? ` / ${v.size}` : ''} · Stock {v.stock} ·{' '}
                                 {priceDisplaySek} kr
                               </div>
                             </div>
@@ -754,7 +756,16 @@ export default async function AdminProductDetailPage({
                         </div>
 
                         {!isEditing && (
-                          <div className="mt-2 flex justify-end">
+                          <div className="mt-2 flex items-center justify-end gap-2">
+                            <BulkSizeVariantsButton
+                              template={{
+                                id: v.id,
+                                sku: v.sku,
+                                colorName: v.color?.name ?? null,
+                                priceInCents: v.priceInCents ?? null,
+                                productId: product.id,
+                              }}
+                            />
                             <DeleteVariantButton variantId={v.id} productId={product.id} />
                           </div>
                         )}
@@ -804,6 +815,22 @@ export default async function AdminProductDetailPage({
                                     </option>
                                   ))}
                                 </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Storlek (valfritt)
+                                </label>
+                                <input
+                                  type="text"
+                                  name="size"
+                                  defaultValue={v.size ?? ''}
+                                  placeholder="t.ex. S, M, L, XL"
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                                <p className="mt-1 text-[10px] text-slate-500">
+                                  Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
+                                </p>
                               </div>
 
                               <div>
@@ -868,6 +895,7 @@ export default async function AdminProductDetailPage({
                       <th className="px-3 py-2">Thumbnail</th>
                       <th className="px-3 py-2">SKU</th>
                       <th className="px-3 py-2">Color</th>
+                      <th className="px-3 py-2">Size</th>
                       <th className="px-3 py-2 text-right">Stock</th>
                       <th className="px-3 py-2 text-right">Price</th>
                       <th className="px-3 py-2 text-center">Badges</th>
@@ -919,6 +947,9 @@ export default async function AdminProductDetailPage({
                             </td>
                             <td className="px-3 py-2 text-[11px] text-slate-700">
                               {v.color?.name ?? '–'}
+                            </td>
+                            <td className="px-3 py-2 text-[11px] text-slate-700">
+                              {v.size ?? '—'}
                             </td>
                             <td className="px-3 py-2 text-right text-[11px] tabular-nums">
                               {v.stock}
@@ -1000,13 +1031,24 @@ export default async function AdminProductDetailPage({
                                 {!isEditing && (
                                   <DeleteVariantButton variantId={v.id} productId={product.id} />
                                 )}
+                                {!isEditing && (
+                                  <BulkSizeVariantsButton
+                                    template={{
+                                      id: v.id,
+                                      sku: v.sku,
+                                      colorName: v.color?.name ?? null,
+                                      priceInCents: v.priceInCents ?? null,
+                                      productId: product.id,
+                                    }}
+                                  />
+                                )}
                               </div>
                             </td>
                           </tr>
 
                           {isEditing && (
                             <tr className="border-b border-slate-100 last:border-0">
-                              <td colSpan={8} className="px-3 py-3 bg-slate-50">
+                              <td colSpan={9} className="px-3 py-3 bg-slate-50">
                                 <AdminForm
                                   action={updateVariant}
                                   className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3"
@@ -1050,6 +1092,22 @@ export default async function AdminProductDetailPage({
                                         </option>
                                       ))}
                                     </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                      Storlek (valfritt)
+                                    </label>
+                                    <input
+                                      type="text"
+                                      name="size"
+                                      defaultValue={v.size ?? ''}
+                                      placeholder="t.ex. S, M, L, XL"
+                                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                    />
+                                    <p className="mt-1 text-[10px] text-slate-500">
+                                      Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
+                                    </p>
                                   </div>
 
                                   <div>
@@ -1153,6 +1211,20 @@ export default async function AdminProductDetailPage({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                  Storlek (valfritt)
+                </label>
+                <input
+                  type="text"
+                  name="size"
+                  placeholder="t.ex. S, M, L, XL"
+                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                />
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">

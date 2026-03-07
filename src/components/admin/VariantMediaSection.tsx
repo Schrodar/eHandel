@@ -1,14 +1,14 @@
 ﻿'use client';
 
 /**
- * VariantMediaSection â€“ affÃ¤rsregel: exakt 0 eller 1 bild per variant.
+ * VariantMediaSection – affärsregel: exakt 0 eller 1 bild per variant.
  *
- * Tidigare bug: flÃ¶det anropade addVariantImageAction() (create) flera gÃ¥nger
+ * Tidigare bug: flödet anropade addVariantImageAction() (create) flera gånger
  * och hanterade inte att raden kanske redan existerade, vilket orsakade P2002
- * pÃ¥ bÃ¥de (variantId, role) och (variantId, assetId)-constraints.
+ * på både (variantId, role) och (variantId, assetId)-constraints.
  *
- * Fix: setVariantImageAction() kÃ¶r deleteMany+create i transaktion sÃ¥ det
- * aldrig kan bli duplikat. UI visar bara Ã©n bild â€“ inget multi-select.
+ * Fix: setVariantImageAction() kör deleteMany+create i transaktion så det
+ * aldrig kan bli duplikat. UI visar bara én bild — inget multi-select.
  */
 
 import { useState } from 'react';
@@ -84,7 +84,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
 
   /**
    * Called by MediaPickerModal with an array of selected assetIds.
-   * We only use the first one (maxSelect=1 in the picker, so itâ€™s always length 1).
+   * We only use the first one (maxSelect=1 in the picker, so it's always length 1).
    * setVariantImageAction atomically replaces any existing image.
    */
   const handlePickerSelect = async (assetIds: string[]) => {
@@ -144,7 +144,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
           </div>
           <div className="flex flex-col gap-2">
             <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              PrimÃ¤rbild
+              Primärbild
             </span>
             <button
               type="button"
@@ -152,7 +152,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
               disabled={isSavingImage}
               className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              ErsÃ¤tt bild
+              Ersätt bild
             </button>
             <button
               type="button"
@@ -175,7 +175,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
             disabled={isSavingImage}
             className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
-            {isSavingImage ? 'Spararâ€¦' : 'VÃ¤lj bild'}
+            {isSavingImage ? 'Sparar…' : 'Välj bild'}
           </button>
         </div>
       )}
@@ -212,12 +212,12 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
               className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
               aria-hidden="true"
             />
-            Aktiverarâ€¦
+            Aktiverar…
           </span>
         )}
       </div>
 
-      {/* Media picker â€“ maxSelect=1 means one click confirms immediately */}
+      {/* Media picker — maxSelect=1 means one click confirms immediately */}
       {isPickerOpen && (
         <MediaPickerModal
           onSelect={handlePickerSelect}
