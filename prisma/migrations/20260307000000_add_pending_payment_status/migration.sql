@@ -1,0 +1,2 @@
+-- AddValue
+ALTER TYPE "CheckoutOrderStatus" ADD VALUE IF NOT EXISTS 'PENDING_PAYMENT';

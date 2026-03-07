@@ -13,8 +13,8 @@ import type { CartItem } from '@/hooks/useCart';
 export type CustomerInfo = {
   /** E-postadress (KRÄVS) */
   email: string;
-  /** Telefonnummer (valfritt initialt) */
-  phone?: string;
+  /** Telefonnummer (KRÄVS) */
+  phone: string;
   /** Förnamn (KRÄVS) */
   firstName: string;
   /** Efternamn (KRÄVS) */
@@ -114,6 +114,9 @@ export function validateCheckoutRequest(request: CheckoutRequest): {
   const { customer } = request;
   if (!customer.email || !customer.email.includes('@')) {
     errors.push('Giltig e-postadress krävs');
+  }
+  if (!customer.phone || customer.phone.trim().length === 0) {
+    errors.push('Mobilnummer krävs');
   }
   if (!customer.firstName || customer.firstName.trim().length === 0) {
     errors.push('Förnamn krävs');

@@ -153,6 +153,7 @@ enum CheckoutOrderStatus {
     FULFILLED
     CANCELLED
     REFUNDED
+    PENDING_PAYMENT  // payment failed; customer can retry on same order
 }
 
 enum PaymentStatus {

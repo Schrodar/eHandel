@@ -33,6 +33,7 @@ export function CheckoutModal({ open, onClose }: Props) {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [orderPublicToken, setOrderPublicToken] = useState<string | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const checkoutRef = useRef<HTMLDivElement | null>(null);
 
   // Scroll to payment section once it is mounted in the DOM
@@ -136,6 +137,7 @@ export function CheckoutModal({ open, onClose }: Props) {
 
         setOrderId(data.orderId);
         setOrderPublicToken(data.publicToken ?? null);
+        setPaymentError(null);
         setShowPaymentForm(true);
         setSubmitting(false);
         return;
@@ -342,10 +344,11 @@ export function CheckoutModal({ open, onClose }: Props) {
 
           <input
             className="w-full rounded-2xl border border-slate-300 p-3 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            placeholder="Telefon (valfritt)"
+            placeholder="Mobilnummer *"
             type="tel"
             value={formData.phone || ''}
             onChange={(e) => updateField('phone', e.target.value)}
+            required
           />
 
           <input
@@ -436,6 +439,11 @@ export function CheckoutModal({ open, onClose }: Props) {
                   Slutför betalning
                 </h4>
               </div>
+              {paymentError && (
+                <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                  <p className="text-sm text-amber-800">{paymentError}</p>
+                </div>
+              )}
               <StripeCardPayment
                 orderId={orderId}
                 publicToken={orderPublicToken ?? ''}
@@ -444,9 +452,9 @@ export function CheckoutModal({ open, onClose }: Props) {
                   // Redirect happens via stripe.confirmPayment return_url
                 }}
                 onError={(error) => {
-                  setCheckoutError(error);
-                  setShowPaymentForm(false);
-                  setOrderId(null);
+                  // Show the error inline but keep the payment form visible
+                  // so the customer can retry on the same order.
+                  setPaymentError(error);
                 }}
               />
             </motion.div>

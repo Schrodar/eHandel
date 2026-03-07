@@ -19,7 +19,7 @@ type ReconcileResult = {
   error?: string;
 };
 
-type Phase = 'reconciling' | 'polling' | 'captured' | 'failed' | 'invalid';
+type Phase = 'reconciling' | 'polling' | 'captured' | 'failed' | 'delayed_confirmation' | 'invalid';
 
 type Props = {
   orderId?: string;
@@ -37,8 +37,11 @@ function deriveInitialPhase(
   paymentIntent: string | undefined,
   redirectStatus: string | undefined,
 ): Phase {
-  if (!orderId || !paymentIntent) return 'invalid';
+  // Need at least an orderId to proceed
+  if (!orderId) return 'invalid';
+  // Explicit failure from Stripe redirect
   if (redirectStatus && redirectStatus !== 'succeeded') return 'failed';
+  // If we have orderId and a success signal, start reconciling even without PI id
   return 'reconciling';
 }
 
@@ -79,27 +82,30 @@ export default function CheckoutSuccessContent({
   }, []);
 
   async function runReconcile() {
-    if (!orderId || !paymentIntent) return;
+    if (!orderId) return;
 
-    try {
-      const res = await fetch(
-        `/api/orders/${orderId}/reconcile?payment_intent=${encodeURIComponent(paymentIntent)}&token=${encodeURIComponent(publicToken ?? '')}`,
-      );
-      const data = (await res.json()) as ReconcileResult;
+    // If we have a payment_intent id, try the fast reconcile path first.
+    if (paymentIntent) {
+      try {
+        const res = await fetch(
+          `/api/orders/${orderId}/reconcile?payment_intent=${encodeURIComponent(paymentIntent)}&token=${encodeURIComponent(publicToken ?? '')}`,
+        );
+        const data = (await res.json()) as ReconcileResult;
 
-      if (data.paymentStatus === 'CAPTURED') {
-        await fetchFinalOrder();
-        return;
+        if (data.paymentStatus === 'CAPTURED') {
+          await fetchFinalOrder();
+          return;
+        }
+
+        if (!res.ok) {
+          console.error('[SuccessPage] Reconcile returned error:', data.error);
+        }
+      } catch (err) {
+        console.error('[SuccessPage] Reconcile request failed:', err);
       }
-
-      if (!res.ok) {
-        console.error('[SuccessPage] Reconcile returned error:', data.error);
-      }
-    } catch (err) {
-      console.error('[SuccessPage] Reconcile request failed:', err);
     }
 
-    // Not captured yet — start polling
+    // Reconcile not done yet (or no PI id) — start polling
     pollStartRef.current = Date.now();
     setPhase('polling');
     schedulePoll();
@@ -131,11 +137,9 @@ export default function CheckoutSuccessContent({
 
     const elapsed = Date.now() - pollStartRef.current;
     if (elapsed >= POLL_TIMEOUT_MS) {
-      setPhase('failed');
-      setErrorMsg(
-        'Betalningen verkar ha tagits emot men orderstatus uppdaterades inte i tid. ' +
-          'Kontakta oss om problemet kvarstår.',
-      );
+      // Don't declare failure — the webhook may still arrive.
+      // Show a "delayed confirmation" message instead.
+      setPhase('delayed_confirmation');
       return;
     }
 
@@ -206,6 +210,32 @@ export default function CheckoutSuccessContent({
             Försök igen
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (phase === 'delayed_confirmation') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4 gap-6">
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-6 max-w-md w-full">
+          <p className="font-semibold text-amber-900 mb-2">Betalningen behandlas</p>
+          <p className="text-sm text-amber-800">
+            Betalningen tar längre tid än väntat. Vi uppdaterar status så snart vi
+            fått besked från betalningsleverantören. Du kommer att få ett
+            bekräftelsemail när betalningen är godkänd.
+          </p>
+          {orderId && (
+            <p className="mt-3 text-xs text-amber-700">
+              Order-id: <span className="font-mono">{orderId}</span>
+            </p>
+          )}
+        </div>
+        <a
+          href="/shop"
+          className="rounded-full border border-slate-300 px-6 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          Tillbaka till butiken
+        </a>
       </div>
     );
   }

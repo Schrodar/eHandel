@@ -158,8 +158,14 @@ const { orders, total, pageSize } = await listOrders({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Ordrar</h1>
-          <p className="text-sm text-slate-500">{total} ordrar totalt</p>
+          <p className="text-sm text-slate-500">{total} hanterbara ordrar</p>
         </div>
+        <Link
+          href="/admin/orders/failed"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 transition"
+        >
+          Misslyckade betalningar →
+        </Link>
       </div>
 
       <form

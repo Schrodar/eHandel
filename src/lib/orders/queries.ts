@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { CheckoutOrderStatus, OrderStatus, PaymentStatus } from '@prisma/client';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -14,6 +14,11 @@ export type OrderListFilters = {
   query?: string;
   page?: number;
   pageSize?: number;
+  /**
+   * When true, includes FAILED / PENDING_PAYMENT orders.
+   * Default: false (main /admin/orders list).
+   */
+  includeFailed?: boolean;
 };
 
 export function normalizePage(value: number | undefined) {
@@ -31,6 +36,16 @@ export async function listOrders(filters: OrderListFilters) {
   const pageSize = normalizePageSize(filters.pageSize);
 
   const where: Prisma.OrderWhereInput = {};
+
+  // By default exclude only definitively failed/retryable orders from the main list
+  // (PENDING/CREATED orders are normal — they appear while waiting for webhook).
+  // The failed orders page (/admin/orders/failed) shows those separately.
+  if (!filters.includeFailed && !filters.paymentStatus) {
+    where.NOT = [
+      { paymentStatus: PaymentStatus.FAILED },
+      { status: CheckoutOrderStatus.PENDING_PAYMENT },
+    ];
+  }
 
   if (filters.paymentStatus) {
     where.paymentStatus = filters.paymentStatus;
@@ -158,4 +173,83 @@ export async function generateOrderNumber(): Promise<string> {
   const count = await prisma.order.count();
   const num = String(count + 1).padStart(4, '0');
   return `ORDER-${year}-${num}`;
+}
+
+// ─── Failed / pending-payment orders ─────────────────────────────────────────
+
+export type FailedOrderFilters = {
+  query?: string;
+  from?: Date;
+  to?: Date;
+  page?: number;
+  pageSize?: number;
+};
+
+/**
+ * Returns orders that are 'ej slutförda' (incomplete / never paid).
+ * Includes:
+ *   - status=CREATED + paymentStatus=PENDING  (checkout started, never paid)
+ *   - paymentStatus=FAILED
+ *   - status=PENDING_PAYMENT
+ */
+export async function listIncompleteOrders(filters: FailedOrderFilters = {}) {
+  const page = normalizePage(filters.page);
+  const pageSize = normalizePageSize(filters.pageSize);
+
+  const where: Prisma.OrderWhereInput = {
+    OR: [
+      {
+        status: CheckoutOrderStatus.CREATED,
+        paymentStatus: PaymentStatus.PENDING,
+      },
+      { paymentStatus: PaymentStatus.FAILED },
+      { status: CheckoutOrderStatus.PENDING_PAYMENT },
+    ],
+  };
+
+  if (filters.from || filters.to) {
+    where.createdAt = {
+      ...(filters.from ? { gte: filters.from } : {}),
+      ...(filters.to ? { lte: filters.to } : {}),
+    };
+  }
+
+  const query = filters.query?.trim();
+  if (query) {
+    where.AND = [
+      {
+        OR: [
+          { orderNumber: { contains: query } },
+          { customerEmail: { contains: query } },
+          { customerName: { contains: query } },
+          { id: { contains: query } },
+        ],
+      },
+    ];
+  }
+
+  const [orders, total] = await prisma.$transaction([
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        orderNumber: true,
+        customerEmail: true,
+        customerName: true,
+        customerPhone: true,
+        paymentStatus: true,
+        status: true,
+        total: true,
+        currency: true,
+        provider: true,
+        createdAt: true,
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return { orders, total, page, pageSize };
 }

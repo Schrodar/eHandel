@@ -1,4 +1,4 @@
-import { PaymentStatus, OrderStatus } from '@prisma/client';
+import { CheckoutOrderStatus, PaymentStatus, OrderStatus } from '@prisma/client';
 
 export function formatPaymentStatus(status: PaymentStatus): string {
   switch (status) {
@@ -14,6 +14,27 @@ export function formatPaymentStatus(status: PaymentStatus): string {
       return 'Återbetald';
     case PaymentStatus.FAILED:
       return 'Misslyckad';
+  }
+  const _exhaustive: never = status;
+  return _exhaustive;
+}
+
+export function formatCheckoutStatus(status: CheckoutOrderStatus): string {
+  switch (status) {
+    case CheckoutOrderStatus.CREATED:
+      return 'Skapad';
+    case CheckoutOrderStatus.AUTHORIZED:
+      return 'Reserverad';
+    case CheckoutOrderStatus.CAPTURED:
+      return 'Betald';
+    case CheckoutOrderStatus.FULFILLED:
+      return 'Fullgjord';
+    case CheckoutOrderStatus.CANCELLED:
+      return 'Avbruten';
+    case CheckoutOrderStatus.REFUNDED:
+      return 'Återbetald';
+    case CheckoutOrderStatus.PENDING_PAYMENT:
+      return 'Väntar betalning';
   }
   const _exhaustive: never = status;
   return _exhaustive;

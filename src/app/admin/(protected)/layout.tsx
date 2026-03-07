@@ -12,6 +12,7 @@ type AdminLayoutProps = {
 const navItems = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/orders', label: 'Ordrar' },
+  { href: '/admin/orders/incomplete', label: 'Ej slutförda köp' },
   { href: '/admin/products', label: 'Produkter' },
   { href: '/admin/categories', label: 'Kategorier' },
   { href: '/admin/materials', label: 'Material' },

@@ -17,13 +17,37 @@
 import { revalidatePath } from 'next/cache';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { prisma } from '@/lib/prisma';
-import { OrderStatus, PaymentStatus } from '@prisma/client';
+import { CheckoutOrderStatus, OrderStatus, PaymentStatus } from '@prisma/client';
 import { markShipped as serviceMarkShipped } from '@/lib/orders/service';
 
 export type OrderActionResult = {
   ok: boolean;
   message: string;
 };
+
+/** Orders in these checkout/payment states can never be fulfilled. */
+const BLOCKED_CHECKOUT_STATUSES = new Set<CheckoutOrderStatus>([
+  CheckoutOrderStatus.PENDING_PAYMENT,
+  CheckoutOrderStatus.CANCELLED,
+]);
+const BLOCKED_PAYMENT_STATUSES = new Set<PaymentStatus>([
+  PaymentStatus.FAILED,
+  PaymentStatus.PENDING,
+  PaymentStatus.CANCELLED,
+]);
+
+function assertFulfillable(order: {
+  status: CheckoutOrderStatus;
+  paymentStatus: PaymentStatus;
+}): string | null {
+  if (BLOCKED_CHECKOUT_STATUSES.has(order.status)) {
+    return `Ordern kan inte behandlas (status: ${order.status}). Betalningen är inte bekräftad.`;
+  }
+  if (BLOCKED_PAYMENT_STATUSES.has(order.paymentStatus)) {
+    return `Ordern kan inte behandlas (betalning: ${order.paymentStatus}). Betalningen är inte bekräftad.`;
+  }
+  return null;
+}
 
 // ─── startPicking ─────────────────────────────────────────────────────────────
 
@@ -34,10 +58,13 @@ export async function startPicking(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { orderStatus: true, paymentStatus: true },
+    select: { orderStatus: true, paymentStatus: true, status: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  const blocked = assertFulfillable(order);
+  if (blocked) return { ok: false, message: blocked };
 
   if (order.paymentStatus !== PaymentStatus.CAPTURED) {
     return { ok: false, message: 'Betalningen är inte bekräftad (CAPTURED)' };
@@ -68,10 +95,13 @@ export async function markPacked(orderId: string): Promise<OrderActionResult> {
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { orderStatus: true },
+    select: { orderStatus: true, paymentStatus: true, status: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  const blocked = assertFulfillable(order);
+  if (blocked) return { ok: false, message: blocked };
 
   if (order.orderStatus !== OrderStatus.PICKING) {
     return { ok: false, message: 'Ordern måste vara i plockläge (PICKING)' };
@@ -110,10 +140,13 @@ export async function markShipped(params: {
 
   const order = await prisma.order.findUnique({
     where: { id: params.orderId },
-    select: { orderStatus: true },
+    select: { orderStatus: true, paymentStatus: true, status: true },
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
+
+  const blocked = assertFulfillable(order);
+  if (blocked) return { ok: false, message: blocked };
 
   if (order.orderStatus !== OrderStatus.PACKED) {
     return {

@@ -32,6 +32,8 @@ export async function POST(req: Request) {
       : undefined;
 
     let clientSecret: string | null = null;
+    // Tracks whether we need a fresh PI (e.g. after cancellation or for a retry)
+    let needsFreshPi = false;
 
     if (paymentIntentId) {
       // Try to reuse existing PaymentIntent
@@ -41,21 +43,30 @@ export async function POST(req: Request) {
           existingPI.status !== 'succeeded' &&
           existingPI.status !== 'canceled'
         ) {
+          // 'requires_payment_method' = previous payment failed; the PI is still
+          // reusable — Stripe PaymentElement will prompt for new card details.
           clientSecret = existingPI.client_secret;
-          console.log(`[PaymentIntent] Reusing existing PI ${paymentIntentId} for order ${order.id}`);
+          console.log(`[PaymentIntent] Reusing existing PI ${paymentIntentId} (status=${existingPI.status}) for order ${order.id}`);
         } else {
-          // Existing PI is done/cancelled – create a fresh one
+          // PI succeeded (captured already) or was canceled — need a fresh one
           paymentIntentId = undefined;
+          needsFreshPi = true;
         }
       } catch {
         // PaymentIntent not found or error, create new one
         paymentIntentId = undefined;
+        needsFreshPi = true;
       }
     }
 
     if (!clientSecret) {
-      // Create new PaymentIntent with orderId in metadata so the webhook can
-      // match it immediately on payment_intent.succeeded.
+      // Create new PaymentIntent. We intentionally omit the idempotencyKey
+      // for retry scenarios (needsFreshPi=true) so Stripe creates a genuine
+      // new PI rather than returning the cached canceled one.
+      const createOptions = needsFreshPi
+        ? {} // no idempotencyKey — retry path
+        : { idempotencyKey: `order_${order.id}` }; // first-time creation
+
       const paymentIntent = await stripe.paymentIntents.create(
         {
           amount: order.total, // Amount in öre (cents)
@@ -68,9 +79,7 @@ export async function POST(req: Request) {
             enabled: true,
           },
         },
-        {
-          idempotencyKey: `order_${order.id}`,
-        },
+        createOptions,
       );
 
       clientSecret = paymentIntent.client_secret;

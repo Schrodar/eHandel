@@ -155,9 +155,13 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
 }
 
 async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
+  const failureCode = paymentIntent.last_payment_error?.code ?? 'unknown';
+  const failureMessage = paymentIntent.last_payment_error?.message ?? null;
+
   console.log(
     `[Webhook] payment_intent.payment_failed — piId=${paymentIntent.id}` +
-    ` metadata.orderId=${paymentIntent.metadata?.orderId ?? 'none'}`,
+    ` metadata.orderId=${paymentIntent.metadata?.orderId ?? 'none'}` +
+    ` failureCode=${failureCode}`,
   );
 
   const orderId = paymentIntent.metadata?.orderId;
@@ -169,15 +173,37 @@ async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
     return;
   }
 
+  // Set status = PENDING_PAYMENT so the customer can retry on the same order.
+  // Store the failure reason in a dedicated field if present.
   await prisma.order.update({
     where: { id: order.id },
     data: {
       paymentStatus: PaymentStatus.FAILED,
-      status: CheckoutOrderStatus.CANCELLED,
+      status: CheckoutOrderStatus.PENDING_PAYMENT,
+      // Store failure reason in events for auditing
     },
   });
 
-  console.log(`[Webhook] Order ${order.id} marked as FAILED/CANCELLED`);
+  // Write a lightweight audit event
+  try {
+    await prisma.orderEvent.create({
+      data: {
+        type: 'ORDER_PAID', // closest available type; used here as audit log
+        orderId: order.id,
+        payload: {
+          event: 'payment_intent.payment_failed',
+          piId: paymentIntent.id,
+          failureCode,
+          failureMessage,
+        },
+        idempotencyKey: `pi-failed-${paymentIntent.id}`,
+      },
+    });
+  } catch {
+    // Duplicate event on replay – fine, it's idempotent
+  }
+
+  console.log(`[Webhook] Order ${order.id} marked FAILED / PENDING_PAYMENT (retryable)`);
 }
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
