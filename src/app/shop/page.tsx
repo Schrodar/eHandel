@@ -3,6 +3,7 @@ import Wardrobe from '@/components/Wardrobe';
 import { ShopPrefetchTopProducts } from '@/components/ShopPrefetchTopProducts';
 import { SAMPLE_WARDROBE } from '@/lib/wardrobeApi';
 import { getAllWardrobeProductsFromDb } from '@/lib/productService';
+import { TriangleSpinner } from '@/components/TriangleSpinner';
 import Link from 'next/link';
 
 export const metadata = {
@@ -24,36 +25,15 @@ function getPageNumber(raw: unknown): number {
   return Math.floor(n);
 }
 
-/*  Skeleton: same grid + card classes as real output  */
-function ShopGridSkeleton() {
+/* Centered triangle-spinner shown while ShopProductList resolves */
+function ShopProductLoader() {
   return (
-    <div className="wardrobe-grid" aria-busy="true" aria-label="Laddar produkter">
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="card animate-pulse">
-          <div
-            className="imgWrap"
-            style={{ background: 'var(--panel)', border: '1px solid rgba(0,0,0,0.04)' }}
-          />
-          <div className="meta" style={{ marginTop: 10 }}>
-            <div
-              style={{
-                height: 16,
-                width: '55%',
-                borderRadius: 6,
-                background: 'rgba(0,0,0,0.08)',
-              }}
-            />
-            <div
-              style={{
-                height: 14,
-                width: '20%',
-                borderRadius: 6,
-                background: 'rgba(0,0,0,0.06)',
-              }}
-            />
-          </div>
-        </div>
-      ))}
+    <div
+      style={{ minHeight: 320 }}
+      className="flex items-center justify-center w-full"
+      aria-busy="true"
+    >
+      <TriangleSpinner />
     </div>
   );
 }
@@ -120,7 +100,7 @@ export default async function ShopPage({ searchParams }: Props) {
       <div className="mx-auto max-w-6xl px-4 sm:px-8">
         <h1 className="text-2xl font-serif mb-4">Shop</h1>
 
-        <Suspense fallback={<ShopGridSkeleton />}>
+        <Suspense fallback={<ShopProductLoader />}>
           <ShopProductList page={page} />
         </Suspense>
       </div>
