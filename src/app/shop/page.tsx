@@ -2,7 +2,7 @@
 import Wardrobe from '@/components/Wardrobe';
 import { ShopPrefetchTopProducts } from '@/components/ShopPrefetchTopProducts';
 import { SAMPLE_WARDROBE } from '@/lib/wardrobeApi';
-import { getAllWardrobeProductsFromDb } from '@/lib/productService';
+import { getAllShopListProducts } from '@/lib/productService';
 import { TriangleSpinner } from '@/components/TriangleSpinner';
 import Link from 'next/link';
 
@@ -42,7 +42,7 @@ function ShopProductLoader() {
 async function ShopProductList({ page }: { page: number }) {
   const skip = (page - 1) * TAKE;
 
-  const productsFromDb = await getAllWardrobeProductsFromDb();
+  const productsFromDb = await getAllShopListProducts();
   const allProducts = productsFromDb.length ? productsFromDb : SAMPLE_WARDROBE;
   const total = allProducts.length;
   const products = allProducts.slice(skip, skip + TAKE);

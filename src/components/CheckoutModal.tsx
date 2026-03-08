@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { CustomerInfo } from './checkout';
 import { validateCheckoutRequest, createCheckoutRequest } from './checkout';
@@ -10,9 +11,15 @@ import { formatPrice } from './products';
 import type { CartItem } from '@/hooks/useCart';
 import { checkoutPaymentMethods } from '@/lib/payments/providers';
 import { PAYMENT_PROVIDERS, type PaymentProviderCode } from '@/lib/payments/types';
-import { StripeCardPayment } from './StripeCardPayment';
 import { MobileCouponBox } from '@/components/cart/MobileCouponBox';
 import { CouponInput } from '@/components/cart/CouponInput';
+
+// Dynamically imported so Stripe JS is never bundled into the main chunk —
+// it only loads once the user opens the checkout form.
+const StripeCardPayment = dynamic(
+  () => import('./StripeCardPayment').then((m) => ({ default: m.StripeCardPayment })),
+  { ssr: false },
+);
 
 type Props = {
   open: boolean;

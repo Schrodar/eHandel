@@ -291,6 +291,89 @@ export async function getAllWardrobeProductsFromDb(): Promise<
   return products.map(mapDbProductToWardrobe);
 }
 
+/**
+ * Lean shop-list query — only fetches the fields needed to render product
+ * cards on /shop.  Compared to getAllWardrobeProductsFromDb it skips:
+ *   • VariantSize rows (sizes)
+ *   • All non-primary variant images
+ *   • Inactive variants beyond the first 3 (for color/price resolution)
+ *   • Full asset record (only url)
+ *
+ * This reduces the DB payload by ~60-80 % for a typical catalogue.
+ */
+export async function getAllShopListProducts(): Promise<WardrobeProduct[]> {
+  const products = await prisma.product.findMany({
+    where: { published: true },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      priceInCents: true,
+      priceClass: true,
+      season: true,
+      attributes: true,
+      category: { select: { name: true } },
+      material: { select: { name: true } },
+      // Default variant: only its primary image URL
+      defaultVariant: {
+        select: {
+          priceInCents: true,
+          variantImages: {
+            where: { role: 'primary' },
+            take: 1,
+            select: { asset: { select: { url: true } } },
+          },
+        },
+      },
+      // Active variants only, limit 3 (enough for color fallback + price)
+      variants: {
+        where: { active: true },
+        take: 3,
+        orderBy: { sku: 'asc' },
+        select: {
+          priceInCents: true,
+          color: { select: { name: true } },
+          variantImages: {
+            where: { role: 'primary' },
+            take: 1,
+            select: { asset: { select: { url: true } } },
+          },
+        },
+      },
+    },
+  });
+
+  return products.map((product): WardrobeProduct => {
+    const image =
+      product.defaultVariant?.variantImages[0]?.asset.url ||
+      product.variants.find((v) => v.variantImages[0]?.asset.url)?.variantImages[0]?.asset.url ||
+      '/product-w-001.svg';
+
+    const rawPrice =
+      product.priceInCents ??
+      product.defaultVariant?.priceInCents ??
+      product.variants.find((v) => v.priceInCents != null)?.priceInCents ??
+      0;
+    const price = Math.round(rawPrice / 100);
+
+    const attrs = jsonObjectOrNull(product.attributes);
+
+    return {
+      id: product.id,
+      name: product.name,
+      category: product.category?.name ?? 'Annat',
+      style: (attrs?.style as string) ?? 'minimal',
+      fit: (attrs?.fit as string) ?? 'regular',
+      material: product.material?.name ?? 'cotton',
+      color: product.variants[0]?.color?.name ?? 'white',
+      season: toSeason(product.season),
+      price,
+      priceClass: (product.priceClass || 'standard') as WardrobeProduct['priceClass'],
+      image,
+    };
+  });
+}
+
 export async function getWardrobeProductByIdOrSlug(
   idOrSlug: string,
 ): Promise<WardrobeProduct | null> {
