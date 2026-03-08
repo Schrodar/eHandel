@@ -355,7 +355,7 @@ export default function ProductDetailClient({ product }: Props) {
                                 : 'bg-white/40 text-black/25 border border-black/8 cursor-not-allowed',
                           ].join(' ')}
                         >
-                          {size}
+                          {size.toUpperCase()}
                           {/* Diagonal strike-through for unavailable sizes */}
                           {!available && (
                             <span

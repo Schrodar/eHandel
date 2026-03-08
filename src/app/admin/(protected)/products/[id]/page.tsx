@@ -840,9 +840,12 @@ export default async function AdminProductDetailPage({
                               <input type="number" name="priceInCents" min="0" placeholder="(ärvs)" className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
                             </div>
                             <div className="col-span-2 flex justify-end">
-                              <button type="submit" className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">
+                              <SubmitButton
+                                className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                                pendingLabel="Lägger till…"
+                              >
                                 + Lägg till storlek
-                              </button>
+                              </SubmitButton>
                             </div>
                           </form>
                         </div>
@@ -1289,12 +1292,12 @@ export default async function AdminProductDetailPage({
                                       className="w-28 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
                                     />
                                   </div>
-                                  <button
-                                    type="submit"
-                                    className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-medium text-white hover:bg-slate-800"
+                                  <SubmitButton
+                                    className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                                    pendingLabel="Lägger till…"
                                   >
                                     + Lägg till
-                                  </button>
+                                  </SubmitButton>
                                 </form>
                               </td>
                             </tr>
