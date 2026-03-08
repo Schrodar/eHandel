@@ -762,22 +762,38 @@ export async function createVariantSize(formData: FormData) {
   // Auto-generate SKU if not provided: VARIANT_SKU-SIZE
   const sizePart = size.toUpperCase().replace(/[^A-Z0-9]/g, '');
   let sku = rawSku || `${parent.sku.toUpperCase()}-${sizePart}`;
-  // Ensure uniqueness
-  const skuTaken = await prisma.variantSize.findUnique({ where: { sku }, select: { sku: true } });
-  if (skuTaken) {
-    const base = sku;
-    for (let i = 2; i <= 50; i++) {
-      const candidate = `${base}-${i}`;
-      const taken = await prisma.variantSize.findUnique({ where: { sku: candidate }, select: { sku: true } });
-      if (!taken) { sku = candidate; break; }
+  // Ensure uniqueness of the new SKU (only matters when creating a new row)
+  const existingRow = await prisma.variantSize.findUnique({
+    where: { variantId_size: { variantId, size } },
+    select: { id: true, sku: true },
+  });
+
+  if (!existingRow) {
+    const skuTaken = await prisma.variantSize.findUnique({ where: { sku }, select: { sku: true } });
+    if (skuTaken) {
+      const base = sku;
+      for (let i = 2; i <= 50; i++) {
+        const candidate = `${base}-${i}`;
+        const taken = await prisma.variantSize.findUnique({ where: { sku: candidate }, select: { sku: true } });
+        if (!taken) { sku = candidate; break; }
+      }
     }
+  } else {
+    // Row already exists – keep existing SKU to avoid breaking references
+    sku = existingRow.sku;
   }
 
-  await prisma.variantSize.create({
-    data: {
+  await prisma.variantSize.upsert({
+    where: { variantId_size: { variantId, size } },
+    create: {
       variantId,
       size,
       sku,
+      stock,
+      priceInCents: priceInCents ?? undefined,
+      active: true,
+    },
+    update: {
       stock,
       priceInCents: priceInCents ?? undefined,
       active: true,
