@@ -1,37 +1,33 @@
 import { TriangleSpinner } from '@/components/TriangleSpinner';
 
 /**
- * Shown by Next.js App Router while ProductPage is fetching data.
- * Matches the phone-frame card shape without duplicating any real UI.
+ * Shown by Next.js App Router while ProductPage fetches data.
+ * Uses the same .phone-frame / .phone-scroll / .product-layout classes
+ * as the real page — skeleton adapts automatically to every breakpoint.
  */
 export default function ProductLoading() {
   return (
     <main className="min-h-dvh bg-[#f3f0ea] flex items-start justify-center py-8">
-      <div
-        style={{
-          width: 'min(420px, 92vw)',
-          borderRadius: 24,
-          background: 'var(--bg, #f3f0ea)',
-          boxShadow: '0 8px 40px rgba(12,15,20,0.10)',
-        }}
-      >
-        {/* Image area skeleton */}
-        <div
-          style={{
-            height: 'clamp(180px, 26vh, 320px)',
-            borderRadius: '44px 44px 44px 44px',
-            margin: '16px 16px 0',
-            background: '#ede9e1',
-            border: '1px solid rgba(0,0,0,0.06)',
-          }}
-        />
+      <div className="phone-frame">
+        <div className="phone-scroll">
+          <section className="w-full px-4 pt-4 pb-8 product-layout">
 
-        {/* Content area: spinner centered */}
-        <div
-          className="flex items-center justify-center"
-          style={{ minHeight: 260, paddingBottom: 32 }}
-        >
-          <TriangleSpinner />
+            {/* Image placeholder — left column on desktop, full width on mobile */}
+            <div
+              className="relative overflow-hidden rounded-[44px] border border-black/10"
+              style={{ background: '#ede9e1', minHeight: 'clamp(180px, 26vh, 320px)' }}
+            />
+
+            {/* Info placeholder — right column on desktop */}
+            <div className="flex flex-col gap-4 px-1 pt-2">
+              <div style={{ height: 34, width: '60%', borderRadius: 8, background: 'rgba(0,0,0,0.07)' }} />
+              <div style={{ height: 14, width: '40%', borderRadius: 6, background: 'rgba(0,0,0,0.05)' }} />
+              <div className="flex flex-1 items-center justify-center" style={{ minHeight: 180 }}>
+                <TriangleSpinner />
+              </div>
+            </div>
+
+          </section>
         </div>
       </div>
     </main>
