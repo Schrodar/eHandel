@@ -103,6 +103,19 @@ export default function ProductDetailClient({ product }: Props) {
     return null;
   });
 
+  // Sizes for currently selected color only (fades in/out on color change)
+  const sizesForColor = useMemo(() => {
+    if (!hasColors || !selectedColorId) return uniqueSizes;
+    const seen = new Set<string>();
+    const raw = variants
+      .filter((v) => v.colorId === selectedColorId && v.size)
+      .reduce<string[]>((acc, v) => {
+        if (!seen.has(v.size!)) { seen.add(v.size!); acc.push(v.size!); }
+        return acc;
+      }, []);
+    return sortSizes(raw);
+  }, [variants, hasColors, selectedColorId, uniqueSizes]);
+
   // ── Resolve selected variant from color + size ────────────────────────────
   const selectedVariant: StorefrontVariant | null = useMemo(() => {
     if (!variants.length) return null;
@@ -172,6 +185,11 @@ export default function ProductDetailClient({ product }: Props) {
     setDirection(next > prev ? 'right' : 'left');
     setSelectedColorId(colorId);
     setSizeError(false);
+    // Clear size selection if that size doesn't exist for the new color
+    if (selectedSize) {
+      const exists = variants.some((v) => v.colorId === colorId && v.size === selectedSize);
+      if (!exists) setSelectedSize(null);
+    }
   }
 
   // ── Add to cart handler ───────────────────────────────────────────────────
@@ -331,57 +349,62 @@ export default function ProductDetailClient({ product }: Props) {
                       </motion.span>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueSizes.map((size) => {
-                      const isSelected = selectedSize === size;
-                      const available = isSizeAvailable(size);
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={selectedColorId ?? 'no-color'}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex flex-wrap gap-2"
+                    >
+                      {sizesForColor.map((size) => {
+                        const isSelected = selectedSize === size;
+                        const available = isSizeAvailable(size);
 
-                      return (
-                        <button
-                          key={size}
-                          type="button"
-                          disabled={!available}
-                          onClick={() => {
-                            setSelectedSize(size);
-                            setSizeError(false);
-                          }}
-                          aria-pressed={isSelected}
-                          className={[
-                            'relative h-10 min-w-[2.75rem] px-3.5 rounded-full text-[13px] font-medium tracking-wide transition-all duration-150 select-none',
-                            isSelected
-                              ? 'bg-black text-white border border-black shadow-sm'
-                              : available
-                                ? 'bg-white/80 text-black border border-black/15 hover:border-black/40 hover:bg-white active:scale-[0.97]'
-                                : 'bg-white/40 text-black/25 border border-black/8 cursor-not-allowed',
-                          ].join(' ')}
-                        >
-                          {size.toUpperCase()}
-                          {/* Diagonal strike-through for unavailable sizes */}
-                          {!available && (
-                            <span
-                              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                              aria-hidden
-                            >
-                              <svg
-                                viewBox="0 0 40 40"
-                                className="absolute inset-0 h-full w-full"
-                                preserveAspectRatio="none"
+                        return (
+                          <button
+                            key={size}
+                            type="button"
+                            disabled={!available}
+                            onClick={() => {
+                              setSelectedSize(size);
+                              setSizeError(false);
+                            }}
+                            aria-pressed={isSelected}
+                            className={[
+                              'relative h-10 min-w-[2.75rem] px-3.5 rounded-full text-[13px] font-medium tracking-wide transition-all duration-150 select-none',
+                              isSelected
+                                ? 'bg-black text-white border border-black shadow-sm'
+                                : available
+                                  ? 'bg-white/80 text-black border border-black/15 hover:border-black/40 hover:bg-white active:scale-[0.97]'
+                                  : 'bg-white/40 text-black/25 border border-black/8 cursor-not-allowed',
+                            ].join(' ')}
+                          >
+                            {size.toUpperCase()}
+                            {!available && (
+                              <span
+                                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                                aria-hidden
                               >
-                                <line
-                                  x1="6"
-                                  y1="34"
-                                  x2="34"
-                                  y2="6"
-                                  stroke="rgba(0,0,0,0.12)"
-                                  strokeWidth="1"
-                                />
-                              </svg>
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                                <svg
+                                  viewBox="0 0 40 40"
+                                  className="absolute inset-0 h-full w-full"
+                                  preserveAspectRatio="none"
+                                >
+                                  <line
+                                    x1="6" y1="34" x2="34" y2="6"
+                                    stroke="rgba(0,0,0,0.12)"
+                                    strokeWidth="1"
+                                  />
+                                </svg>
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               )}
 

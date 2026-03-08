@@ -6,7 +6,7 @@ import { useCartContext } from '@/context/CartProvider';
 import { formatPrice } from '@/components/products';
 
 export function CartPanel() {
-  const { items, openCheckout } = useCartContext();
+  const { items, openCheckout, checkoutOpen } = useCartContext();
   // Render nothing on the server to avoid hydration mismatch (cart lives in localStorage)
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
 
@@ -18,7 +18,7 @@ export function CartPanel() {
 
   return (
     <AnimatePresence>
-      {hasItems && (
+      {hasItems && !checkoutOpen && (
         <motion.div
           key="cart-panel"
           initial={{ y: '100%', opacity: 0 }}

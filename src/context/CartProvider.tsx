@@ -4,6 +4,8 @@ import React, { createContext, useContext, useSyncExternalStore, useState } from
 import { useCart } from '../hooks/useCart';
 import { CartDrawer } from '@/components/CartDrawer';
 import { CheckoutModal } from '@/components/CheckoutModal';
+import { CartPanel } from '@/components/cart/CartPanel';
+import { DesktopCartLauncher } from '@/components/cart/DesktopCartLauncher';
 
 type CartContextValue = ReturnType<typeof useCart> & {
   openCart: () => void;
@@ -70,6 +72,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           onClose={closeCheckout}
         />
       )}
+      {/* Rendered here (outside TransitionProvider) so position:fixed is never
+          broken by the page-transition transform on motion.main */}
+      <CartPanel />
+      <DesktopCartLauncher />
     </CartContext.Provider>
   );
 }
