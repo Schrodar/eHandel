@@ -828,8 +828,8 @@ export default async function AdminProductDetailPage({
                               <input type="text" name="size" required placeholder="t.ex. S" className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
                             </div>
                             <div>
-                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU</label>
-                              <input type="text" name="sku" required placeholder={`${v.sku}-S`} className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
+                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU (auto)</label>
+                              <input type="text" name="sku" placeholder={`${v.sku}-SIZE (auto)`} className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
                             </div>
                             <div>
                               <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Lager</label>
@@ -896,35 +896,6 @@ export default async function AdminProductDetailPage({
 
                               <div>
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                  Storlek (valfritt)
-                                </label>
-                                <input
-                                  type="text"
-                                  name="size"
-                                  defaultValue={v.size ?? ''}
-                                  placeholder="t.ex. S, M, L, XL"
-                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                />
-                                <p className="mt-1 text-[10px] text-slate-500">
-                                  Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
-                                </p>
-                              </div>
-
-                              <div>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                  Stock
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  name="stock"
-                                  defaultValue={v.stock}
-                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                   Price (SEK)
                                 </label>
                                 <input
@@ -972,8 +943,7 @@ export default async function AdminProductDetailPage({
                       <th className="px-3 py-2">Thumbnail</th>
                       <th className="px-3 py-2">SKU</th>
                       <th className="px-3 py-2">Color</th>
-                      <th className="px-3 py-2">Size</th>
-                      <th className="px-3 py-2 text-right">Stock</th>
+                      <th className="px-3 py-2">Storlekar</th>
                       <th className="px-3 py-2 text-right">Price</th>
                       <th className="px-3 py-2 text-center">Badges</th>
                       <th className="px-3 py-2 text-center">Active</th>
@@ -1025,11 +995,14 @@ export default async function AdminProductDetailPage({
                             <td className="px-3 py-2 text-[11px] text-slate-700">
                               {v.color?.name ?? '–'}
                             </td>
-                            <td className="px-3 py-2 text-[11px] text-slate-700">
-                              {v.size ?? '—'}
-                            </td>
-                            <td className="px-3 py-2 text-right text-[11px] tabular-nums">
-                              {v.stock}
+                            <td className="px-3 py-2 text-[11px]">
+                              {v.sizes.length > 0 ? (
+                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                                  {v.sizes.length} st
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
                             </td>
                             <td className="px-3 py-2 text-right text-[11px] tabular-nums">
                               {effectivePriceLabel}
@@ -1046,9 +1019,9 @@ export default async function AdminProductDetailPage({
                                     No images
                                   </span>
                                 )}
-                                {v.stock === 0 && (
-                                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-700">
-                                    Stock 0
+                                {v.sizes.length === 0 && (
+                                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                    No sizes
                                   </span>
                                 )}
                               </div>
@@ -1125,7 +1098,7 @@ export default async function AdminProductDetailPage({
 
                           {isEditing && (
                             <tr className="border-b border-slate-100 last:border-0">
-                              <td colSpan={9} className="px-3 py-3 bg-slate-50">
+                              <td colSpan={8} className="px-3 py-3 bg-slate-50">
                                 <AdminForm
                                   action={updateVariant}
                                   className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3"
@@ -1173,35 +1146,6 @@ export default async function AdminProductDetailPage({
 
                                   <div>
                                     <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                      Storlek (valfritt)
-                                    </label>
-                                    <input
-                                      type="text"
-                                      name="size"
-                                      defaultValue={v.size ?? ''}
-                                      placeholder="t.ex. S, M, L, XL"
-                                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                    />
-                                    <p className="mt-1 text-[10px] text-slate-500">
-                                      Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                                      Stock
-                                    </label>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      name="stock"
-                                      defaultValue={v.stock}
-                                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                       Price (SEK)
                                     </label>
                                     <input
@@ -1241,7 +1185,7 @@ export default async function AdminProductDetailPage({
                           {/* ─── VariantSize sub-rows ─── */}
                           {(v.sizes.length > 0 || true) && (
                             <tr className="border-b border-slate-100 last:border-0 bg-slate-50/60">
-                              <td colSpan={9} className="px-4 py-3">
+                              <td colSpan={8} className="px-4 py-3">
                                 <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
                                   Storlekar (VariantSize)
                                 </div>
@@ -1317,13 +1261,12 @@ export default async function AdminProductDetailPage({
                                     />
                                   </div>
                                   <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU</label>
+                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU (auto)</label>
                                     <input
                                       type="text"
                                       name="sku"
-                                      required
-                                      placeholder={`${v.sku}-S`}
-                                      className="w-32 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
+                                      placeholder={`${v.sku}-SIZE (auto)`}
+                                      className="w-36 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
                                     />
                                   </div>
                                   <div className="flex flex-col gap-1">
@@ -1407,32 +1350,6 @@ export default async function AdminProductDetailPage({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                  Storlek (valfritt)
-                </label>
-                <input
-                  type="text"
-                  name="size"
-                  placeholder="t.ex. S, M, L, XL"
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                />
-                <p className="mt-1 text-[10px] text-slate-500">
-                  Lämna tomt för produkter utan storlek, t.ex. mössor eller accessoarer.
-                </p>
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
-                  Stock
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  name="stock"
-                  defaultValue={0}
-                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                />
               </div>
               <div>
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">

@@ -741,22 +741,36 @@ export async function createVariantSize(formData: FormData) {
   const variantId = String(formData.get('variantId') ?? '').trim();
   const productId = String(formData.get('productId') ?? '').trim();
   const size = String(formData.get('size') ?? '').trim();
-  const sku = String(formData.get('sku') ?? '').trim().toUpperCase();
+  const rawSku = String(formData.get('sku') ?? '').trim().toUpperCase();
   const stock = Math.max(0, parseInt(String(formData.get('stock') ?? '0'), 10) || 0);
   const rawPrice = String(formData.get('priceInCents') ?? '').trim();
   const priceInCents = rawPrice ? parseInt(rawPrice, 10) || null : null;
 
-  if (!variantId || !productId || !size || !sku) {
+  if (!variantId || !productId || !size) {
     redirect(`/admin/products/${productId}?tab=variants&error=missing-size-fields`);
   }
 
   // Verify the variant belongs to this product
   const parent = await prisma.productVariant.findUnique({
     where: { id: variantId },
-    select: { productId: true },
+    select: { productId: true, sku: true },
   });
   if (!parent || parent.productId !== productId) {
     redirect(`/admin/products/${productId}?tab=variants&error=variant-product-mismatch`);
+  }
+
+  // Auto-generate SKU if not provided: VARIANT_SKU-SIZE
+  const sizePart = size.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let sku = rawSku || `${parent.sku.toUpperCase()}-${sizePart}`;
+  // Ensure uniqueness
+  const skuTaken = await prisma.variantSize.findUnique({ where: { sku }, select: { sku: true } });
+  if (skuTaken) {
+    const base = sku;
+    for (let i = 2; i <= 50; i++) {
+      const candidate = `${base}-${i}`;
+      const taken = await prisma.variantSize.findUnique({ where: { sku: candidate }, select: { sku: true } });
+      if (!taken) { sku = candidate; break; }
+    }
   }
 
   await prisma.variantSize.create({
