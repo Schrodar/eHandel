@@ -199,13 +199,13 @@ export default function ProductDetailClient({ product }: Props) {
   }
 
   return (
-    <main className="min-h-dvh bg-[#f3f0ea] flex items-center justify-center py-8">
+    <main className="min-h-dvh bg-[#f3f0ea] flex items-start justify-center py-8">
       <div className="phone-frame">
         <div className="phone-scroll">
           <section className="w-full px-4 pt-4 pb-8 product-layout">
             {/* ── Product image ────────────────────────────────────────── */}
             <div className="relative overflow-hidden rounded-[44px] border border-black/10 bg-[#f7f4ee] shadow-[0_20px_40px_-20px_rgba(0,0,0,0.18)]">
-              <div className="relative h-[clamp(240px,36vh,380px)] lg:h-[60vh]">
+              <div className="relative h-[clamp(180px,26vh,320px)] lg:h-[60vh]">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={selectedColorId ?? primaryImage}

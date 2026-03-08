@@ -51,21 +51,17 @@ body {
 /* Editorial phone-frame container used for mobile-first centered layout */
 .phone-frame {
   width: min(420px, 92vw);
-  height: min(844px, 92vh);
-  max-height: 92vh;
+  /* No fixed height on mobile — content grows naturally, single page scroll */
   border-radius: 24px;
   background: var(--bg);
   box-shadow: var(--soft-shadow);
   border: none;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* Scrollable inner column for content inside the phone frame */
+/* Inner column — no overflow scroll on mobile, page scrolls naturally */
 .phone-frame .phone-scroll {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding: 22px 20px;
   display: flex;
   flex-direction: column;
