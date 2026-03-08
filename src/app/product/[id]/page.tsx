@@ -140,6 +140,7 @@ export default async function ProductPage({ params }: Props) {
                 priceInCents: Math.round(fallback!.price * 100),
                 stock: 10,
                 active: true,
+                sizes: [],
               },
             ],
           }}

@@ -732,3 +732,135 @@ export async function deleteVariant(formData: FormData) {
 
   redirect(`/admin/products/${productId}?tab=variants`);
 }
+
+// ─── VariantSize CRUD ─────────────────────────────────────────────────────────
+
+export async function createVariantSize(formData: FormData) {
+  await assertAdmin();
+
+  const variantId = String(formData.get('variantId') ?? '').trim();
+  const productId = String(formData.get('productId') ?? '').trim();
+  const size = String(formData.get('size') ?? '').trim();
+  const sku = String(formData.get('sku') ?? '').trim().toUpperCase();
+  const stock = Math.max(0, parseInt(String(formData.get('stock') ?? '0'), 10) || 0);
+  const rawPrice = String(formData.get('priceInCents') ?? '').trim();
+  const priceInCents = rawPrice ? parseInt(rawPrice, 10) || null : null;
+
+  if (!variantId || !productId || !size || !sku) {
+    redirect(`/admin/products/${productId}?tab=variants&error=missing-size-fields`);
+  }
+
+  // Verify the variant belongs to this product
+  const parent = await prisma.productVariant.findUnique({
+    where: { id: variantId },
+    select: { productId: true },
+  });
+  if (!parent || parent.productId !== productId) {
+    redirect(`/admin/products/${productId}?tab=variants&error=variant-product-mismatch`);
+  }
+
+  await prisma.variantSize.create({
+    data: {
+      variantId,
+      size,
+      sku,
+      stock,
+      priceInCents: priceInCents ?? undefined,
+      active: true,
+    },
+  });
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+  revalidatePath('/admin');
+
+  redirect(`/admin/products/${productId}?tab=variants`);
+}
+
+export async function updateVariantSize(formData: FormData) {
+  await assertAdmin();
+
+  const id = String(formData.get('id') ?? '').trim();
+  const productId = String(formData.get('productId') ?? '').trim();
+  const size = String(formData.get('size') ?? '').trim();
+  const sku = String(formData.get('sku') ?? '').trim().toUpperCase();
+  const stock = Math.max(0, parseInt(String(formData.get('stock') ?? '0'), 10) || 0);
+  const rawPrice = String(formData.get('priceInCents') ?? '').trim();
+  const priceInCents = rawPrice ? parseInt(rawPrice, 10) || null : null;
+  const active = formData.get('active') === 'true';
+
+  if (!id || !productId || !size || !sku) {
+    redirect(`/admin/products/${productId}?tab=variants&error=missing-size-fields`);
+  }
+
+  // Verify the VariantSize belongs to a variant in this product
+  const existing = await prisma.variantSize.findUnique({
+    where: { id },
+    select: { variant: { select: { productId: true } } },
+  });
+  if (!existing || existing.variant.productId !== productId) {
+    redirect(`/admin/products/${productId}?tab=variants&error=size-product-mismatch`);
+  }
+
+  await prisma.variantSize.update({
+    where: { id },
+    data: { size, sku, stock, priceInCents: priceInCents ?? undefined, active },
+  });
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+  revalidatePath('/admin');
+
+  redirect(`/admin/products/${productId}?tab=variants`);
+}
+
+export async function deleteVariantSize(formData: FormData) {
+  await assertAdmin();
+
+  const id = String(formData.get('id') ?? '').trim();
+  const productId = String(formData.get('productId') ?? '').trim();
+
+  if (!id || !productId) {
+    redirect(`/admin/products/${productId}?tab=variants&error=missing-size-id`);
+  }
+
+  const existing = await prisma.variantSize.findUnique({
+    where: { id },
+    select: { variant: { select: { productId: true } } },
+  });
+  if (!existing || existing.variant.productId !== productId) {
+    redirect(`/admin/products/${productId}?tab=variants&error=size-product-mismatch`);
+  }
+
+  await prisma.variantSize.delete({ where: { id } });
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+  revalidatePath('/admin');
+
+  redirect(`/admin/products/${productId}?tab=variants`);
+}
+
+export async function toggleVariantSizeActive(
+  id: string,
+  productId: string,
+  active: boolean,
+) {
+  await assertAdmin();
+
+  const existing = await prisma.variantSize.findUnique({
+    where: { id },
+    select: { variant: { select: { productId: true } } },
+  });
+  if (!existing || existing.variant.productId !== productId) return;
+
+  await prisma.variantSize.update({ where: { id }, data: { active } });
+
+  revalidatePath(`/admin/products/${productId}`);
+  revalidatePath('/admin/products');
+  revalidatePath('/shop');
+  revalidatePath('/admin');
+}

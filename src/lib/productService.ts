@@ -3,17 +3,36 @@ import type { Season, WardrobeProduct } from '@/lib/wardrobeApi';
 import type { Prisma } from '@prisma/client';
 import { getPrimaryImage, type VariantWithImages } from '@/lib/mediaPolicy';
 
-// Storefront types for product + variants
+// ─── Storefront types ─────────────────────────────────────────────────────────
+
+/** A purchasable size row attached to a visual variant. */
+export type StorefrontSize = {
+  id: string;              // VariantSize.id
+  size: string;
+  sku: string;
+  stock: number;
+  priceInCents: number;    // resolved: VariantSize.priceInCents ?? parent variant price
+  active: boolean;
+};
+
+/**
+ * One visual variant (color).  When VariantSize rows exist `sizes` is
+ * populated and `size` is null.  During the migration period variants that
+ * still use the legacy `size` column emit `sizes: []` and `size` is set.
+ */
 export type StorefrontVariant = {
   id: string;
   sku: string;
   colorId: string | null;
   colorName: string | null;
   colorHex: string | null;
-  size: string | null; // optional size label, e.g. "S", "M", "L"
+  /** Legacy: set when the variant still uses ProductVariant.size directly. */
+  size: string | null;
+  /** New model: child VariantSize rows (empty array = legacy variant). */
+  sizes: StorefrontSize[];
   images: string[];
-  priceInCents: number; // price in öre, Klarna-ready
-  stock: number;
+  priceInCents: number;   // base / fallback price in öre
+  stock: number;          // total available stock across all sizes
   active: boolean;
 };
 
@@ -26,13 +45,14 @@ export type StorefrontProduct = {
   categoryName: string;
   materialId: string;
   materialName: string;
-  priceInCents: number; // base price in öre
+  priceInCents: number;
   priceClass: string;
   season: string;
-  // Flattened attributes from JSON for now
   attributes: Record<string, unknown> | null;
   variants: StorefrontVariant[];
 };
+
+// ─── DB payload type ──────────────────────────────────────────────────────────
 
 type DbProductWithRelations = Prisma.ProductGetPayload<{
   include: {
@@ -45,6 +65,7 @@ type DbProductWithRelations = Prisma.ProductGetPayload<{
       include: {
         color: true;
         variantImages: { include: { asset: true } };
+        sizes: true;
       };
     };
   };
@@ -166,25 +187,56 @@ function mapDbProductToStorefront(
 ): StorefrontProduct {
   const basePriceInCents = resolveBasePriceInCents(product);
 
-  const variants: StorefrontVariant[] = (product.variants ?? [])
-    .filter((v) => v && v.active)
-    .map((v) => {
-      const images = getVariantImageUrls(v);
+  const variants: StorefrontVariant[] = [];
 
-      const priceInCents: number =
-        typeof v.priceInCents === 'number' && Number.isInteger(v.priceInCents)
-          ? v.priceInCents
-          : basePriceInCents;
+  for (const v of product.variants ?? []) {
+    if (!v || !v.active) continue;
 
-      return {
+    const images = getVariantImageUrls(v);
+    const variantPriceInCents =
+      typeof v.priceInCents === 'number' && Number.isInteger(v.priceInCents)
+        ? v.priceInCents
+        : basePriceInCents;
+
+    const colorId = v.color?.id ?? v.colorId ?? null;
+    const colorName = v.color?.name ?? null;
+    const colorHex = v.color?.hex ?? null;
+
+    const activeSizes = (v.sizes ?? []).filter((s) => s.active);
+
+    if (activeSizes.length > 0) {
+      // ── New model: one StorefrontVariant per active VariantSize ───────
+      for (const sz of activeSizes) {
+        const sizePrice =
+          typeof sz.priceInCents === 'number' && Number.isInteger(sz.priceInCents)
+            ? sz.priceInCents
+            : variantPriceInCents;
+        variants.push({
+          id: sz.id,
+          sku: sz.sku,
+          colorId,
+          colorName,
+          colorHex,
+          size: sz.size,
+          sizes: [],
+          images,
+          priceInCents: sizePrice,
+          stock: typeof sz.stock === 'number' && sz.stock >= 0 ? sz.stock : 0,
+          active: true,
+        } satisfies StorefrontVariant);
+      }
+    } else {
+      // ── Legacy compat: variant still uses ProductVariant.size directly ─
+      variants.push({
         id: String(v.id),
         sku: String(v.sku),
-        colorId: v.color?.id ?? v.colorId ?? null,
-        colorName: v.color?.name ?? null,
-        colorHex: v.color?.hex ?? null,
+        colorId,
+        colorName,
+        colorHex,
         size: v.size ?? null,
+        sizes: [],
         images,
-        priceInCents,
+        priceInCents: variantPriceInCents,
         stock:
           typeof v.stock === 'number' &&
           Number.isInteger(v.stock) &&
@@ -192,8 +244,9 @@ function mapDbProductToStorefront(
             ? v.stock
             : 0,
         active: Boolean(v.active),
-      } satisfies StorefrontVariant;
-    });
+      } satisfies StorefrontVariant);
+    }
+  }
 
   return {
     id: String(product.id),
@@ -227,6 +280,7 @@ export async function getAllWardrobeProductsFromDb(): Promise<
         include: {
           color: true,
           variantImages: { include: { asset: true } },
+          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },
@@ -256,6 +310,7 @@ export async function getWardrobeProductByIdOrSlug(
         include: {
           color: true,
           variantImages: { include: { asset: true } },
+          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },
@@ -286,6 +341,7 @@ export async function getStorefrontProductByIdOrSlug(
         include: {
           color: true,
           variantImages: { include: { asset: true } },
+          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },
