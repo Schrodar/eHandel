@@ -208,7 +208,7 @@ export default function ProductDetailClient({ product }: Props) {
               <div className="relative h-[clamp(240px,36vh,380px)] lg:h-[60vh]">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
-                    key={selectedVariant?.id ?? 'default'}
+                    key={selectedColorId ?? primaryImage}
                     initial={{
                       x: direction === 'left' ? '-100%' : '100%',
                       opacity: 0,
