@@ -255,6 +255,10 @@ export async function resolveDiscountForCart(params: {
 /**
  * Convert client-sent `[{ variantId, quantity }]` to server-authoritative
  * ResolveCartLine[] by looking up prices and category from the DB.
+ *
+ * Supports two ID shapes:
+ *  - ProductVariant.id  (legacy / no-size products)
+ *  - VariantSize.id     (new model: one purchasable row per color+size)
  */
 export async function buildCartLinesFromVariantIds(
   input: Array<{ variantId: string; quantity: number }>,
@@ -262,6 +266,7 @@ export async function buildCartLinesFromVariantIds(
   const ids = input.map((i) => i.variantId).filter(Boolean);
   if (!ids.length) return [];
 
+  // 1. Try ProductVariant lookup first (legacy path)
   const variants = await prisma.productVariant.findMany({
     where: { id: { in: ids }, active: true },
     include: {
@@ -270,13 +275,67 @@ export async function buildCartLinesFromVariantIds(
       },
     },
   });
+  const byVariantId = new Map(variants.map((v) => [v.id, v]));
 
-  const byId = new Map(variants.map((v) => [v.id, v]));
+  // 2. IDs not found as ProductVariant may be VariantSize IDs (new model)
+  const unresolvedIds = ids.filter((id) => !byVariantId.has(id));
+  type SzInfo = {
+    sizePrice: number | null;
+    parentPrice: number | null;
+    productId: string;
+    categoryId: string;
+    productPrice: number | null;
+    published: boolean;
+  };
+  const bySizeId = new Map<string, SzInfo>();
+
+  if (unresolvedIds.length > 0) {
+    const variantSizes = await prisma.variantSize.findMany({
+      where: { id: { in: unresolvedIds }, active: true },
+      include: {
+        variant: {
+          include: {
+            product: {
+              select: { id: true, categoryId: true, priceInCents: true, published: true },
+            },
+          },
+        },
+      },
+    });
+    for (const sz of variantSizes) {
+      bySizeId.set(sz.id, {
+        sizePrice: sz.priceInCents,
+        parentPrice: sz.variant.priceInCents,
+        productId: sz.variant.product.id,
+        categoryId: sz.variant.product.categoryId,
+        productPrice: sz.variant.product.priceInCents,
+        published: sz.variant.product.published,
+      });
+    }
+  }
 
   return input.flatMap((item) => {
-    const variant = byId.get(item.variantId);
-    if (!variant || !variant.product.published) return [];
     const qty = Math.max(1, Math.floor(item.quantity));
+
+    // New model: VariantSize ID
+    const sz = bySizeId.get(item.variantId);
+    if (sz) {
+      if (!sz.published) return [];
+      const unitPrice = sz.sizePrice ?? sz.parentPrice ?? sz.productPrice ?? 0;
+      if (unitPrice <= 0) return [];
+      return [
+        {
+          variantId: item.variantId,
+          productId: sz.productId,
+          categoryId: sz.categoryId,
+          lineTotal: unitPrice * qty,
+        },
+      ];
+    }
+
+    // Legacy: ProductVariant ID
+    const variant = byVariantId.get(item.variantId);
+    if (!variant || !variant.product.published) return [];
     const unitPrice = variant.priceInCents ?? variant.product.priceInCents ?? 0;
     if (unitPrice <= 0) return [];
     return [
