@@ -1,7 +1,7 @@
 // app/hooks/useCart.ts
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 
 /**
  * Cart item snapshot stored in client state and sent to backend.
@@ -33,17 +33,17 @@ export type AppliedDiscount = {
   code: string;
   driveId: string;
   driveName: string;
-  discountAmount: number;         // öre
+  discountAmount: number; // öre
   shippingDiscountAmount: number; // öre
-  eligibleSubtotal: number;       // öre
+  eligibleSubtotal: number; // öre
   appliedToHint: { kind: string; label: string; shopLink?: string };
 };
 
 /** @deprecated use AppliedDiscount */
 export type AppliedCoupon = AppliedDiscount;
 
-const STORAGE_KEY = "cart:v1";
-const COUPON_STORAGE_KEY = "cart:discount:v1";
+const STORAGE_KEY = 'cart:v1';
+const COUPON_STORAGE_KEY = 'cart:discount:v1';
 
 export function useCart() {
   // Viktigt för att undvika hydration mismatch:
@@ -54,12 +54,12 @@ export function useCart() {
 
   // Läs in sparad vagn efter mount (endast i browsern)
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as CartState;
-        if (parsed && typeof parsed === "object") {
+        if (parsed && typeof parsed === 'object') {
           setCart(parsed);
         }
       }
@@ -72,7 +72,7 @@ export function useCart() {
 
   // Läs in sparad kupong efter mount
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     try {
       const raw = window.localStorage.getItem(COUPON_STORAGE_KEY);
       if (raw) {
@@ -86,7 +86,7 @@ export function useCart() {
 
   // Skriv tillbaka till localStorage när cart ändras (endast i browsern)
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     if (!hydrated) return;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cart));
@@ -97,7 +97,7 @@ export function useCart() {
 
   // Persist coupon state
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
     if (!hydrated) return;
     try {
       if (coupon) {
@@ -117,7 +117,7 @@ export function useCart() {
 
   const totalQty = items.reduce((sum, it) => sum + it.quantity, 0);
 
-  function add(snapshot: Omit<CartItem, "quantity"> & { quantity?: number }) {
+  function add(snapshot: Omit<CartItem, 'quantity'> & { quantity?: number }) {
     const sku = snapshot.sku;
     setCart((current) => {
       const existing = current[sku];
@@ -184,6 +184,16 @@ export function useCart() {
     setCoupon(null);
   }
 
-  return { cart, items, totalQty, add, setQty, remove, reset, coupon, applyCoupon, removeCoupon } as const;
+  return {
+    cart,
+    items,
+    totalQty,
+    add,
+    setQty,
+    remove,
+    reset,
+    coupon,
+    applyCoupon,
+    removeCoupon,
+  } as const;
 }
-      

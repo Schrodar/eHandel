@@ -8,18 +8,6 @@ import type { ResolveCartLine } from '@/lib/discounts/resolve';
 
 const DEFAULT_TAX_RATE_BP = 2500;
 
-function hasVariantId(
-  item: CheckoutRequest['items'][number],
-): item is CheckoutRequest['items'][number] & { variantId: string } {
-  return typeof item.variantId === 'string' && item.variantId.length > 0;
-}
-
-function hasSku(
-  item: CheckoutRequest['items'][number],
-): item is CheckoutRequest['items'][number] & { sku: string } {
-  return typeof item.sku === 'string' && item.sku.length > 0;
-}
-
 function isCustomerValid(customer: CustomerInfo) {
   if (!customer?.email?.includes('@')) return false;
   if (!customer.firstName?.trim()) return false;
@@ -36,7 +24,10 @@ export async function POST(req: Request) {
     const body = (await req.json()) as CheckoutRequest;
 
     if (!body?.items?.length) {
-      return NextResponse.json({ error: 'Varukorgen är tom.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Varukorgen är tom.' },
+        { status: 400 },
+      );
     }
 
     if (!isCustomerValid(body.customer)) {
@@ -46,20 +37,59 @@ export async function POST(req: Request) {
       );
     }
 
-    const requestedByVariantId = new Map(
-      body.items.filter(hasVariantId).map((item) => [item.variantId, item]),
+    console.info('[checkout:create-order] incoming payload', {
+      itemCount: body.items.length,
+      items: body.items.map((item, index) => ({
+        index,
+        variantId: item.variantId ?? null,
+        sku: item.sku ?? null,
+        quantity: item.quantity,
+      })),
+    });
+
+    const hasAnyLookupValue = body.items.some(
+      (item) =>
+        (typeof item.variantId === 'string' && item.variantId.length > 0) ||
+        (typeof item.sku === 'string' && item.sku.length > 0),
     );
 
-    const requestedBySku = new Map(
-      body.items.filter(hasSku).map((item) => [item.sku, item]),
-    );
-
-    if (!requestedByVariantId.size && !requestedBySku.size) {
+    if (!hasAnyLookupValue) {
       return NextResponse.json(
         { error: 'Varukorgen saknar variant-id/SKU.' },
         { status: 400 },
       );
     }
+
+    const orderItems: {
+      productId: string;
+      variantId: string;
+      productName: string;
+      variantName: string | null;
+      sku: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+    }[] = [];
+
+    const requestedByVariantId = new Map(
+      body.items
+        .filter(
+          (
+            item,
+          ): item is CheckoutRequest['items'][number] & { variantId: string } =>
+            typeof item.variantId === 'string' && item.variantId.length > 0,
+        )
+        .map((item) => [item.variantId, item]),
+    );
+
+    const requestedBySku = new Map(
+      body.items
+        .filter(
+          (item): item is CheckoutRequest['items'][number] & { sku: string } =>
+            typeof item.sku === 'string' && item.sku.length > 0,
+        )
+        .map((item) => [item.sku, item]),
+    );
 
     const variants = await prisma.productVariant.findMany({
       where: {
@@ -90,33 +120,45 @@ export async function POST(req: Request) {
       },
     });
 
-    const variantById = new Map(variants.map((variant) => [variant.id, variant]));
-    const variantBySku = new Map(variants.map((variant) => [variant.sku, variant]));
+    const variantById = new Map(
+      variants.map((variant) => [variant.id, variant]),
+    );
+    const variantBySku = new Map(
+      variants.map((variant) => [variant.sku, variant]),
+    );
 
-    const orderItems: {
-      productId: string;
-      variantId: string;
-      productName: string;
-      variantName: string | null;
-      sku: string;
-      quantity: number;
-      unitPrice: number;
-      lineTotal: number;
-    }[] = [];
-
-    for (const item of body.items) {
+    for (const [index, item] of body.items.entries()) {
       const quantity = Math.floor(Number(item.quantity));
       if (!Number.isInteger(quantity) || quantity < 1) {
-        return NextResponse.json({ error: 'Ogiltigt antal i varukorgen.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Ogiltigt antal i varukorgen.' },
+          { status: 400 },
+        );
       }
 
       const variant =
         (item.variantId ? variantById.get(item.variantId) : undefined) ||
         (item.sku ? variantBySku.get(item.sku) : undefined);
 
+      console.info('[checkout:create-order] variant lookup', {
+        index,
+        incomingVariantId: item.variantId ?? null,
+        incomingSku: item.sku ?? null,
+        lookupBy: variant
+          ? item.variantId && variant.id === item.variantId
+            ? 'variant-id'
+            : 'sku'
+          : 'not-found',
+        resolvedVariantId: variant?.id ?? null,
+        resolvedSku: variant?.sku ?? null,
+      });
+
       if (!variant) {
         return NextResponse.json(
-          { error: `Variant hittades inte (${item.sku ?? item.variantId ?? 'okänd'})` },
+          {
+            error: `Variant hittades inte (${item.sku ?? item.variantId ?? 'okänd'})`,
+            index,
+          },
           { status: 404 },
         );
       }
@@ -137,8 +179,13 @@ export async function POST(req: Request) {
         );
       }
 
-      const rawUnitAmount = variant.priceInCents ?? variant.product.priceInCents;
-      if (rawUnitAmount == null || !Number.isInteger(rawUnitAmount) || rawUnitAmount <= 0) {
+      const rawUnitAmount =
+        variant.priceInCents ?? variant.product.priceInCents;
+      if (
+        rawUnitAmount == null ||
+        !Number.isInteger(rawUnitAmount) ||
+        rawUnitAmount <= 0
+      ) {
         return NextResponse.json(
           { error: `Pris saknas för ${variant.product.name}.` },
           { status: 400 },
@@ -152,7 +199,10 @@ export async function POST(req: Request) {
         productId: variant.product.id,
         variantId: variant.id,
         productName: variant.product.name,
-        variantName: [variant.color?.name, variant.size].filter(Boolean).join(' / ') || item.variantLabel || null,
+        variantName:
+          [variant.color?.name, variant.size].filter(Boolean).join(' / ') ||
+          item.variantLabel ||
+          null,
         sku: variant.sku,
         quantity,
         unitPrice: unitAmount,
@@ -168,13 +218,6 @@ export async function POST(req: Request) {
     let appliedDriveId: string | null = null;
 
     if (body.discountCode) {
-      const resolveLines: ResolveCartLine[] = orderItems.map((line) => ({
-        variantId: line.variantId,
-        productId: line.productId,
-        categoryId: '', // fetched below
-        lineTotal: line.lineTotal,
-      }));
-
       // Enrich with categoryId from DB (already validated variants above)
       const variantIds = orderItems.map((l) => l.variantId);
       const variants = await prisma.productVariant.findMany({
@@ -203,7 +246,8 @@ export async function POST(req: Request) {
           NOT_FOUND: 'Rabattkoden hittades inte.',
           DRIVE_INACTIVE: 'Rabattkoden är inte längre aktiv.',
           CODE_EXHAUSTED: 'Rabattkoden har redan använts.',
-          NOT_APPLICABLE_TO_CART: 'Rabattkoden gäller inte för varorna i din kundvagn.',
+          NOT_APPLICABLE_TO_CART:
+            'Rabattkoden gäller inte för varorna i din kundvagn.',
           MIN_ORDER_NOT_MET: 'Minsta ordervärde för koden är inte uppnått.',
         };
         return NextResponse.json(
@@ -218,11 +262,14 @@ export async function POST(req: Request) {
     }
 
     const total = subtotal - discount;
-    const tax = Math.round((total * DEFAULT_TAX_RATE_BP) / (10000 + DEFAULT_TAX_RATE_BP));
+    const tax = Math.round(
+      (total * DEFAULT_TAX_RATE_BP) / (10000 + DEFAULT_TAX_RATE_BP),
+    );
 
     const orderNumber = await generateOrderNumber();
     const publicToken =
-      crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      crypto.randomUUID().replace(/-/g, '') +
+      crypto.randomUUID().replace(/-/g, '');
 
     const createdOrder = await prisma.order.create({
       data: {
@@ -231,7 +278,8 @@ export async function POST(req: Request) {
         paymentStatus: PaymentStatus.PENDING,
         orderStatus: OrderStatus.NEW,
         customerEmail: body.customer.email,
-        customerName: `${body.customer.firstName} ${body.customer.lastName}`.trim(),
+        customerName:
+          `${body.customer.firstName} ${body.customer.lastName}`.trim(),
         customerPhone: body.customer.phone || null,
         shippingAddressLine1: body.customer.streetAddress,
         shippingPostalCode: body.customer.postalCode,

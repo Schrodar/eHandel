@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { bulkCreateSizeVariants } from '@/app/admin/(protected)/products/actions';
+import { bulkCreateProductVariantsFromTemplate } from '@/app/admin/(protected)/products/actions';
 
 // ─── Canonical size order ─────────────────────────────────────────────────────
 const PRESET_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
@@ -34,10 +34,7 @@ export function BulkSizeVariantsButton({ template }: Props) {
         + Storlekar
       </button>
       {open && (
-        <BulkSizeModal
-          template={template}
-          onClose={() => setOpen(false)}
-        />
+        <BulkSizeModal template={template} onClose={() => setOpen(false)} />
       )}
     </>
   );
@@ -57,7 +54,11 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
   const [useBulkStock, setUseBulkStock] = useState(true);
   const [customSize, setCustomSize] = useState('');
   const [extraSizes, setExtraSizes] = useState<string[]>([]);
-  const [result, setResult] = useState<{ created: number; skipped: number; errors: string[] } | null>(null);
+  const [result, setResult] = useState<{
+    created: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -73,13 +74,16 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
   // Prevent body scroll while open
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, []);
 
   const allSizes = [...PRESET_SIZES, ...extraSizes];
-  const priceLabel = template.priceInCents != null
-    ? `${(template.priceInCents / 100).toFixed(0)} kr`
-    : '—';
+  const priceLabel =
+    template.priceInCents != null
+      ? `${(template.priceInCents / 100).toFixed(0)} kr`
+      : '—';
 
   function toggleSize(size: string) {
     setSelectedSizes((prev) => {
@@ -115,7 +119,11 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
     }));
 
     startTransition(async () => {
-      const res = await bulkCreateSizeVariants(template.id, template.productId, entries);
+      const res = await bulkCreateProductVariantsFromTemplate(
+        template.id,
+        template.productId,
+        entries,
+      );
       setResult(res);
     });
   }
@@ -124,13 +132,17 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
       <div className="relative w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">Skapa storleksvarianter</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              Skapa storleksvarianter
+            </h2>
             <p className="mt-0.5 text-xs text-slate-500">
               Varje storlek skapar en separat variant baserad på mallvarianten.
             </p>
@@ -156,15 +168,21 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
             </div>
             <div className="grid grid-cols-3 gap-2 text-slate-700">
               <div>
-                <div className="text-[10px] text-slate-400 font-medium">SKU</div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  SKU
+                </div>
                 <div className="font-mono mt-0.5">{template.sku}</div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-medium">Färg</div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Färg
+                </div>
                 <div className="mt-0.5">{template.colorName ?? '—'}</div>
               </div>
               <div>
-                <div className="text-[10px] text-slate-400 font-medium">Pris</div>
+                <div className="text-[10px] text-slate-400 font-medium">
+                  Pris
+                </div>
                 <div className="mt-0.5">{priceLabel}</div>
               </div>
             </div>
@@ -205,7 +223,12 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
                 type="text"
                 value={customSize}
                 onChange={(e) => setCustomSize(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSize(); }}}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomSize();
+                  }
+                }}
                 placeholder="Egen storlek, t.ex. 36"
                 className="flex-1 rounded-md border border-slate-200 px-3 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
               />
@@ -239,12 +262,16 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
 
               {useBulkStock ? (
                 <div className="flex items-center gap-3">
-                  <label className="text-xs text-slate-600 whitespace-nowrap">Lager för alla storlekar:</label>
+                  <label className="text-xs text-slate-600 whitespace-nowrap">
+                    Lager för alla storlekar:
+                  </label>
                   <input
                     type="number"
                     min="0"
                     value={bulkStock}
-                    onChange={(e) => setBulkStock(Math.max(0, Number(e.target.value)))}
+                    onChange={(e) =>
+                      setBulkStock(Math.max(0, Number(e.target.value)))
+                    }
                     className="w-24 rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                   />
                 </div>
@@ -260,7 +287,10 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
                         min="0"
                         value={stocks[size] ?? 0}
                         onChange={(e) =>
-                          setStocks((prev) => ({ ...prev, [size]: Math.max(0, Number(e.target.value)) }))
+                          setStocks((prev) => ({
+                            ...prev,
+                            [size]: Math.max(0, Number(e.target.value)),
+                          }))
                         }
                         className="flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                       />
@@ -285,13 +315,18 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
                 {result.created > 0
                   ? `${result.created} variant${result.created > 1 ? 'er' : ''} skapades`
                   : 'Inga varianter skapades'}
-                {result.skipped > 0 && ` · ${result.skipped} hoppades över (redan finns)`}
+                {result.skipped > 0 &&
+                  ` · ${result.skipped} hoppades över (redan finns)`}
               </div>
               {result.errors.map((e, i) => (
-                <div key={i} className="text-amber-800 mt-0.5">{e}</div>
+                <div key={i} className="text-amber-800 mt-0.5">
+                  {e}
+                </div>
               ))}
               {result.created > 0 && (
-                <p className="mt-1 text-emerald-700">Uppdatera sidan för att se de nya varianterna.</p>
+                <p className="mt-1 text-emerald-700">
+                  Uppdatera sidan för att se de nya varianterna.
+                </p>
               )}
             </div>
           )}
@@ -321,7 +356,10 @@ function BulkSizeModal({ template, onClose }: ModalProps) {
           {result && result.created > 0 && (
             <button
               type="button"
-              onClick={() => { onClose(); window.location.reload(); }}
+              onClick={() => {
+                onClose();
+                window.location.reload();
+              }}
               className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
             >
               Ladda om sidan

@@ -164,7 +164,10 @@ export function createCheckoutRequest(
     product_url: c.productUrl,
   }));
 
-  const client_total_amount = items.reduce((s, it) => s + it.unit_price * it.quantity, 0);
+  const client_total_amount = items.reduce(
+    (s, it) => s + it.unit_price * it.quantity,
+    0,
+  );
   const client_total_tax_amount = items.reduce((s, it) => {
     const total = it.unit_price * it.quantity;
     const divisor = 10000 + it.tax_rate;

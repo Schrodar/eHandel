@@ -4,7 +4,11 @@ import { notFound } from 'next/navigation';
 import { Fragment } from 'react';
 import AdminForm from '@/components/admin/AdminForm';
 import VariantMediaSection from '@/components/admin/VariantMediaSection';
-import { canActivateVariant, getPrimaryImage, type VariantWithImages } from '@/lib/mediaPolicy';
+import {
+  canActivateVariant,
+  getPrimaryImage,
+  type VariantWithImages,
+} from '@/lib/mediaPolicy';
 import {
   createVariant,
   deleteProduct,
@@ -13,9 +17,6 @@ import {
   updateProduct,
   updateVariant,
   setDefaultVariant,
-  createVariantSize,
-  deleteVariantSize,
-  toggleVariantSizeActive,
 } from '../actions';
 import { SubmitButton } from '@/components/admin/SubmitButton';
 import { DeleteVariantButton } from '@/components/admin/DeleteVariantButton';
@@ -91,10 +92,6 @@ export default async function AdminProductDetailPage({
             variantImages: {
               include: { asset: true },
               orderBy: { sortOrder: 'asc' },
-            },
-            sizes: {
-              select: { id: true, size: true, sku: true, stock: true, priceInCents: true, active: true },
-              orderBy: { size: 'asc' },
             },
           },
           orderBy: { sku: 'asc' },
@@ -686,8 +683,9 @@ export default async function AdminProductDetailPage({
                                 </span>
                               </div>
                               <div className="mt-0.5 truncate text-xs text-slate-600">
-                                {v.color?.name ?? '–'}{v.size ? ` / ${v.size}` : ''} · Stock {v.stock} ·{' '}
-                                {priceDisplaySek} kr
+                                {v.color?.name ?? '–'}
+                                {v.size ? ` / ${v.size}` : ''} · Stock {v.stock}{' '}
+                                · {priceDisplaySek} kr
                               </div>
                             </div>
                           </div>
@@ -773,82 +771,17 @@ export default async function AdminProductDetailPage({
                                 productId: product.id,
                               }}
                             />
-                            <DeleteVariantButton variantId={v.id} productId={product.id} />
+                            <DeleteVariantButton
+                              variantId={v.id}
+                              productId={product.id}
+                            />
                           </div>
                         )}
 
-                        {/* ─── Mobile VariantSize section ─── */}
-                        <div className="mt-4 border-t border-slate-100 pt-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                            Storlekar (VariantSize)
-                          </div>
-                          {v.sizes.length > 0 ? (
-                            <div className="space-y-1 mb-3">
-                              {v.sizes.map((sz) => (
-                                <div key={sz.id} className="flex items-center justify-between rounded-md bg-slate-50 px-2 py-1.5 text-[11px]">
-                                  <span className="font-medium w-10">{sz.size}</span>
-                                  <span className="font-mono text-slate-500 flex-1 truncate">{sz.sku}</span>
-                                  <span className="tabular-nums text-slate-700 w-10 text-right">{sz.stock}</span>
-                                  <form className="inline ml-2">
-                                    <button
-                                      type="submit"
-                                      formAction={async () => {
-                                        'use server';
-                                        await toggleVariantSizeActive(sz.id, product.id, !sz.active);
-                                      }}
-                                      className={sz.active
-                                        ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700'
-                                        : 'rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-600'
-                                      }
-                                    >
-                                      {sz.active ? 'Aktiv' : 'Inaktiv'}
-                                    </button>
-                                  </form>
-                                  <form action={deleteVariantSize} className="inline ml-1">
-                                    <input type="hidden" name="id" value={sz.id} />
-                                    <input type="hidden" name="productId" value={product.id} />
-                                    <button
-                                      type="submit"
-                                      className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-medium text-rose-700"
-                                    >
-                                      ✕
-                                    </button>
-                                  </form>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-slate-400 mb-3">Inga storlekar ännu.</p>
-                          )}
-                          <form action={createVariantSize} className="grid grid-cols-2 gap-2">
-                            <input type="hidden" name="variantId" value={v.id} />
-                            <input type="hidden" name="productId" value={product.id} />
-                            <div>
-                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Storlek</label>
-                              <input type="text" name="size" required placeholder="t.ex. S" className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU (auto)</label>
-                              <input type="text" name="sku" placeholder={`${v.sku}-SIZE (auto)`} className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Lager</label>
-                              <input type="number" name="stock" min="0" defaultValue={0} className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
-                            </div>
-                            <div>
-                              <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Pris (öre, valfri)</label>
-                              <input type="number" name="priceInCents" min="0" placeholder="(ärvs)" className="mt-0.5 w-full rounded-md border border-slate-200 px-2 py-1 text-xs" />
-                            </div>
-                            <div className="col-span-2 flex justify-end">
-                              <SubmitButton
-                                className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                                pendingLabel="Lägger till…"
-                              >
-                                + Lägg till storlek
-                              </SubmitButton>
-                            </div>
-                          </form>
-                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          Skapa fler storleksvarianter via knappen{' '}
+                          <span className="font-medium">+ Storlekar</span>.
+                        </p>
 
                         {isEditing && (
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -946,7 +879,7 @@ export default async function AdminProductDetailPage({
                       <th className="px-3 py-2">Thumbnail</th>
                       <th className="px-3 py-2">SKU</th>
                       <th className="px-3 py-2">Color</th>
-                      <th className="px-3 py-2">Storlekar</th>
+                      <th className="px-3 py-2">Storlek</th>
                       <th className="px-3 py-2 text-right">Price</th>
                       <th className="px-3 py-2 text-center">Badges</th>
                       <th className="px-3 py-2 text-center">Active</th>
@@ -955,7 +888,9 @@ export default async function AdminProductDetailPage({
                   </thead>
                   <tbody>
                     {product.variants.map((v) => {
-                      const primaryImage = getPrimaryImage(v as VariantWithImages);
+                      const primaryImage = getPrimaryImage(
+                        v as VariantWithImages,
+                      );
                       const previewUrl =
                         primaryImage?.url ||
                         v.variantImages[0]?.asset.url ||
@@ -998,14 +933,8 @@ export default async function AdminProductDetailPage({
                             <td className="px-3 py-2 text-[11px] text-slate-700">
                               {v.color?.name ?? '–'}
                             </td>
-                            <td className="px-3 py-2 text-[11px]">
-                              {v.sizes.length > 0 ? (
-                                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                                  {v.sizes.length} st
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
+                            <td className="px-3 py-2 text-[11px] text-slate-700">
+                              {v.size ?? '—'}
                             </td>
                             <td className="px-3 py-2 text-right text-[11px] tabular-nums">
                               {effectivePriceLabel}
@@ -1020,11 +949,6 @@ export default async function AdminProductDetailPage({
                                 {!hasImages && (
                                   <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                                     No images
-                                  </span>
-                                )}
-                                {v.sizes.length === 0 && (
-                                  <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                                    No sizes
                                   </span>
                                 )}
                               </div>
@@ -1082,7 +1006,10 @@ export default async function AdminProductDetailPage({
                                   </Link>
                                 )}
                                 {!isEditing && (
-                                  <DeleteVariantButton variantId={v.id} productId={product.id} />
+                                  <DeleteVariantButton
+                                    variantId={v.id}
+                                    productId={product.id}
+                                  />
                                 )}
                                 {!isEditing && (
                                   <BulkSizeVariantsButton
@@ -1185,123 +1112,7 @@ export default async function AdminProductDetailPage({
                             </tr>
                           )}
 
-                          {/* ─── VariantSize sub-rows ─── */}
-                          {(v.sizes.length > 0 || true) && (
-                            <tr className="border-b border-slate-100 last:border-0 bg-slate-50/60">
-                              <td colSpan={8} className="px-4 py-3">
-                                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                                  Storlekar (VariantSize)
-                                </div>
-                                {v.sizes.length > 0 ? (
-                                  <table className="w-full text-[11px] mb-3">
-                                    <thead>
-                                      <tr className="text-[10px] text-slate-500 uppercase tracking-wide">
-                                        <th className="text-left py-1 pr-3">Storlek</th>
-                                        <th className="text-left py-1 pr-3">SKU</th>
-                                        <th className="text-right py-1 pr-3">Lager</th>
-                                        <th className="text-right py-1 pr-3">Pris</th>
-                                        <th className="text-center py-1 pr-3">Aktiv</th>
-                                        <th className="text-right py-1"></th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {v.sizes.map((sz) => (
-                                        <tr key={sz.id} className="border-t border-slate-100">
-                                          <td className="py-1 pr-3 font-medium">{sz.size}</td>
-                                          <td className="py-1 pr-3 font-mono text-slate-600">{sz.sku}</td>
-                                          <td className="py-1 pr-3 text-right tabular-nums">{sz.stock}</td>
-                                          <td className="py-1 pr-3 text-right tabular-nums">
-                                            {sz.priceInCents != null ? (sz.priceInCents / 100).toFixed(2) : '—'}
-                                          </td>
-                                          <td className="py-1 pr-3 text-center">
-                                            <form className="inline">
-                                              <button
-                                                type="submit"
-                                                formAction={async () => {
-                                                  'use server';
-                                                  await toggleVariantSizeActive(sz.id, product.id, !sz.active);
-                                                }}
-                                                className={sz.active
-                                                  ? 'rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700 hover:bg-emerald-100'
-                                                  : 'rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-medium text-slate-600 hover:bg-slate-200'
-                                                }
-                                              >
-                                                {sz.active ? 'Aktiv' : 'Inaktiv'}
-                                              </button>
-                                            </form>
-                                          </td>
-                                          <td className="py-1 text-right">
-                                            <form action={deleteVariantSize} className="inline">
-                                              <input type="hidden" name="id" value={sz.id} />
-                                              <input type="hidden" name="productId" value={product.id} />
-                                              <button
-                                                type="submit"
-                                                className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-medium text-rose-700 hover:bg-rose-100"
-                                              >
-                                                Ta bort
-                                              </button>
-                                            </form>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                ) : (
-                                  <p className="text-[11px] text-slate-400 mb-3">Inga storlekar ännu.</p>
-                                )}
-                                {/* Add size form */}
-                                <form action={createVariantSize} className="flex flex-wrap items-end gap-2">
-                                  <input type="hidden" name="variantId" value={v.id} />
-                                  <input type="hidden" name="productId" value={product.id} />
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Storlek</label>
-                                    <input
-                                      type="text"
-                                      name="size"
-                                      required
-                                      placeholder="t.ex. S"
-                                      className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">SKU (auto)</label>
-                                    <input
-                                      type="text"
-                                      name="sku"
-                                      placeholder={`${v.sku}-SIZE (auto)`}
-                                      className="w-36 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Lager</label>
-                                    <input
-                                      type="number"
-                                      name="stock"
-                                      min="0"
-                                      defaultValue={0}
-                                      className="w-20 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
-                                    />
-                                  </div>
-                                  <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Pris (öre, valfri)</label>
-                                    <input
-                                      type="number"
-                                      name="priceInCents"
-                                      min="0"
-                                      placeholder="(ärvs)"
-                                      className="w-28 rounded-md border border-slate-200 px-2 py-1 text-xs focus:border-slate-400 focus:outline-none"
-                                    />
-                                  </div>
-                                  <SubmitButton
-                                    className="rounded-full bg-slate-900 px-3 py-1 text-[10px] font-medium text-white hover:bg-slate-800 disabled:opacity-60"
-                                    pendingLabel="Lägger till…"
-                                  >
-                                    + Lägg till
-                                  </SubmitButton>
-                                </form>
-                              </td>
-                            </tr>
-                          )}
+                          {/* No nested size rows: each purchasable size is its own ProductVariant. */}
                         </Fragment>
                       );
                     })}

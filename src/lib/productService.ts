@@ -5,34 +5,17 @@ import { getPrimaryImage, type VariantWithImages } from '@/lib/mediaPolicy';
 
 // ─── Storefront types ─────────────────────────────────────────────────────────
 
-/** A purchasable size row attached to a visual variant. */
-export type StorefrontSize = {
-  id: string;              // VariantSize.id
-  size: string;
-  sku: string;
-  stock: number;
-  priceInCents: number;    // resolved: VariantSize.priceInCents ?? parent variant price
-  active: boolean;
-};
-
-/**
- * One visual variant (color).  When VariantSize rows exist `sizes` is
- * populated and `size` is null.  During the migration period variants that
- * still use the legacy `size` column emit `sizes: []` and `size` is set.
- */
+/** Storefront variant maps directly to one ProductVariant row. */
 export type StorefrontVariant = {
   id: string;
   sku: string;
   colorId: string | null;
   colorName: string | null;
   colorHex: string | null;
-  /** Legacy: set when the variant still uses ProductVariant.size directly. */
   size: string | null;
-  /** New model: child VariantSize rows (empty array = legacy variant). */
-  sizes: StorefrontSize[];
   images: string[];
-  priceInCents: number;   // base / fallback price in öre
-  stock: number;          // total available stock across all sizes
+  priceInCents: number; // base / fallback price in öre
+  stock: number; // total available stock across all sizes
   active: boolean;
 };
 
@@ -65,7 +48,6 @@ type DbProductWithRelations = Prisma.ProductGetPayload<{
       include: {
         color: true;
         variantImages: { include: { asset: true } };
-        sizes: true;
       };
     };
   };
@@ -125,7 +107,9 @@ function mapDbProductToWardrobe(
   // Priority 1: defaultVariant primary image
   let image = '';
   if (product.defaultVariant) {
-    const primaryImage = getPrimaryImage(product.defaultVariant as VariantWithImages);
+    const primaryImage = getPrimaryImage(
+      product.defaultVariant as VariantWithImages,
+    );
     if (primaryImage?.url) {
       image = primaryImage.url;
     }
@@ -201,51 +185,24 @@ function mapDbProductToStorefront(
     const colorId = v.color?.id ?? v.colorId ?? null;
     const colorName = v.color?.name ?? null;
     const colorHex = v.color?.hex ?? null;
+    const size =
+      'size' in v ? ((v as { size?: string | null }).size ?? null) : null;
 
-    const activeSizes = (v.sizes ?? []).filter((s) => s.active);
-
-    if (activeSizes.length > 0) {
-      // ── New model: one StorefrontVariant per active VariantSize ───────
-      for (const sz of activeSizes) {
-        const sizePrice =
-          typeof sz.priceInCents === 'number' && Number.isInteger(sz.priceInCents)
-            ? sz.priceInCents
-            : variantPriceInCents;
-        variants.push({
-          id: sz.id,
-          sku: sz.sku,
-          colorId,
-          colorName,
-          colorHex,
-          size: sz.size,
-          sizes: [],
-          images,
-          priceInCents: sizePrice,
-          stock: typeof sz.stock === 'number' && sz.stock >= 0 ? sz.stock : 0,
-          active: true,
-        } satisfies StorefrontVariant);
-      }
-    } else {
-      // ── Legacy compat: variant still uses ProductVariant.size directly ─
-      variants.push({
-        id: String(v.id),
-        sku: String(v.sku),
-        colorId,
-        colorName,
-        colorHex,
-        size: v.size ?? null,
-        sizes: [],
-        images,
-        priceInCents: variantPriceInCents,
-        stock:
-          typeof v.stock === 'number' &&
-          Number.isInteger(v.stock) &&
-          v.stock >= 0
-            ? v.stock
-            : 0,
-        active: Boolean(v.active),
-      } satisfies StorefrontVariant);
-    }
+    variants.push({
+      id: String(v.id),
+      sku: String(v.sku),
+      colorId,
+      colorName,
+      colorHex,
+      size,
+      images,
+      priceInCents: variantPriceInCents,
+      stock:
+        typeof v.stock === 'number' && Number.isInteger(v.stock) && v.stock >= 0
+          ? v.stock
+          : 0,
+      active: Boolean(v.active),
+    } satisfies StorefrontVariant);
   }
 
   return {
@@ -280,7 +237,6 @@ export async function getAllWardrobeProductsFromDb(): Promise<
         include: {
           color: true,
           variantImages: { include: { asset: true } },
-          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },
@@ -294,7 +250,6 @@ export async function getAllWardrobeProductsFromDb(): Promise<
 /**
  * Lean shop-list query — only fetches the fields needed to render product
  * cards on /shop.  Compared to getAllWardrobeProductsFromDb it skips:
- *   • VariantSize rows (sizes)
  *   • All non-primary variant images
  *   • Inactive variants beyond the first 3 (for color/price resolution)
  *   • Full asset record (only url)
@@ -346,7 +301,8 @@ export async function getAllShopListProducts(): Promise<WardrobeProduct[]> {
   return products.map((product): WardrobeProduct => {
     const image =
       product.defaultVariant?.variantImages[0]?.asset.url ||
-      product.variants.find((v) => v.variantImages[0]?.asset.url)?.variantImages[0]?.asset.url ||
+      product.variants.find((v) => v.variantImages[0]?.asset.url)
+        ?.variantImages[0]?.asset.url ||
       '/product-w-001.svg';
 
     const rawPrice =
@@ -368,7 +324,8 @@ export async function getAllShopListProducts(): Promise<WardrobeProduct[]> {
       color: product.variants[0]?.color?.name ?? 'white',
       season: toSeason(product.season),
       price,
-      priceClass: (product.priceClass || 'standard') as WardrobeProduct['priceClass'],
+      priceClass: (product.priceClass ||
+        'standard') as WardrobeProduct['priceClass'],
       image,
     };
   });
@@ -393,7 +350,6 @@ export async function getWardrobeProductByIdOrSlug(
         include: {
           color: true,
           variantImages: { include: { asset: true } },
-          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },
@@ -424,7 +380,6 @@ export async function getStorefrontProductByIdOrSlug(
         include: {
           color: true,
           variantImages: { include: { asset: true } },
-          sizes: { orderBy: { size: 'asc' } },
         },
         orderBy: { sku: 'asc' },
       },

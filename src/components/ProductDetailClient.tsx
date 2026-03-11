@@ -19,8 +19,17 @@ function formatPriceSekFromOre(amountInOre: number): string {
 
 // Canonical size order for sorting
 const SIZE_ORDER: Record<string, number> = {
-  XXS: 0, XS: 1, S: 2, M: 3, L: 4, XL: 5, XXL: 6, XXXL: 7, '3XL': 7,
-  '4XL': 8, '5XL': 9,
+  XXS: 0,
+  XS: 1,
+  S: 2,
+  M: 3,
+  L: 4,
+  XL: 5,
+  XXL: 6,
+  XXXL: 7,
+  '3XL': 7,
+  '4XL': 8,
+  '5XL': 9,
 };
 
 function sizeRank(s: string): number {
@@ -40,7 +49,13 @@ function sortSizes(sizes: string[]): string[] {
 function hexToLuminance(hex: string): number {
   try {
     const h = hex.replace('#', '');
-    const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+    const full =
+      h.length === 3
+        ? h
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : h;
     const bigint = parseInt(full, 16);
     const r = (bigint >> 16) & 255;
     const g = (bigint >> 8) & 255;
@@ -110,7 +125,10 @@ export default function ProductDetailClient({ product }: Props) {
     const raw = variants
       .filter((v) => v.colorId === selectedColorId && v.size)
       .reduce<string[]>((acc, v) => {
-        if (!seen.has(v.size!)) { seen.add(v.size!); acc.push(v.size!); }
+        if (!seen.has(v.size!)) {
+          seen.add(v.size!);
+          acc.push(v.size!);
+        }
         return acc;
       }, []);
     return sortSizes(raw);
@@ -126,21 +144,21 @@ export default function ProductDetailClient({ product }: Props) {
         (v) => v.colorId === selectedColorId && v.size === selectedSize,
       );
       // Fall back to same color any size, then anything
-      return match
-        ?? variants.find((v) => v.colorId === selectedColorId)
-        ?? variants[0];
+      return (
+        match ??
+        variants.find((v) => v.colorId === selectedColorId) ??
+        variants[0]
+      );
     }
 
     // Only color
     if (hasColors && !hasSizes) {
-      return variants.find((v) => v.colorId === selectedColorId)
-        ?? variants[0];
+      return variants.find((v) => v.colorId === selectedColorId) ?? variants[0];
     }
 
     // Only size
     if (!hasColors && hasSizes) {
-      return variants.find((v) => v.size === selectedSize)
-        ?? variants[0];
+      return variants.find((v) => v.size === selectedSize) ?? variants[0];
     }
 
     // Neither (single variant)
@@ -149,8 +167,8 @@ export default function ProductDetailClient({ product }: Props) {
 
   // ── Image / price ─────────────────────────────────────────────────────────
   const primaryImage =
-    (selectedVariant?.images?.length ? selectedVariant.images[0] : null)
-    ?? '/product-placeholder.png';
+    (selectedVariant?.images?.length ? selectedVariant.images[0] : null) ??
+    '/product-placeholder.png';
 
   const currentPriceInCents =
     selectedVariant?.priceInCents ?? product.priceInCents;
@@ -173,7 +191,9 @@ export default function ProductDetailClient({ product }: Props) {
   // ── Smart variant label for cart ──────────────────────────────────────────
   const variantDisplayLabel = useMemo(() => {
     if (!selectedVariant) return undefined;
-    const parts = [selectedVariant.colorName, selectedVariant.size].filter(Boolean);
+    const parts = [selectedVariant.colorName, selectedVariant.size].filter(
+      Boolean,
+    );
     return parts.length > 0 ? parts.join(' / ') : undefined;
   }, [selectedVariant]);
 
@@ -187,7 +207,9 @@ export default function ProductDetailClient({ product }: Props) {
     setSizeError(false);
     // Clear size selection if that size doesn't exist for the new color
     if (selectedSize) {
-      const exists = variants.some((v) => v.colorId === colorId && v.size === selectedSize);
+      const exists = variants.some(
+        (v) => v.colorId === colorId && v.size === selectedSize,
+      );
       if (!exists) setSelectedSize(null);
     }
   }
@@ -393,7 +415,10 @@ export default function ProductDetailClient({ product }: Props) {
                                   preserveAspectRatio="none"
                                 >
                                   <line
-                                    x1="6" y1="34" x2="34" y2="6"
+                                    x1="6"
+                                    y1="34"
+                                    x2="34"
+                                    y2="6"
                                     stroke="rgba(0,0,0,0.12)"
                                     strokeWidth="1"
                                   />
@@ -448,4 +473,3 @@ export default function ProductDetailClient({ product }: Props) {
     </main>
   );
 }
-

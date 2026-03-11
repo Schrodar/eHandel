@@ -73,16 +73,15 @@ model ProductVariant {
     colorId String?
     color   Color?  @relation(fields: [colorId], references: [id])
 
-    size         String? // legacy: kept for backward-compat during migration; use VariantSize going forward
+    size String?
 
     images       Json? // deprecated: use VariantImage instead
-    priceInCents Int? // fallback price for all sizes; overridden per size in VariantSize
-    stock        Int     @default(0) // legacy stock; kept for compat – sum/min managed via VariantSize
+    priceInCents Int?
+    stock        Int     @default(0)
     attributes   Json?
     active       Boolean @default(true)
 
     variantImages VariantImage[]
-    sizes         VariantSize[]  // child size-inventory rows
 
     // Backreference for when this variant is set as default
     defaultForProduct Product? @relation("defaultVariant")
@@ -91,79 +90,61 @@ model ProductVariant {
     @@index([colorId])
 }
 
-/// Size-level inventory row attached to a visual variant (e.g. color).
-/// Replaces having one full ProductVariant per size.
-model VariantSize {
-    id           String         @id @default(cuid())
-    variantId    String
-    variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-
-    size         String         // "XS" | "S" | "M" | "L" | "XL" | "XXL" | …
-    sku          String         @unique // e.g. "TSHIRT-WHITE-M"
-    stock        Int            @default(0)
-    priceInCents Int?           // override; null = inherit from ProductVariant.priceInCents
-    active       Boolean        @default(true)
-
-    createdAt    DateTime       @default(now())
-    updatedAt    DateTime       @updatedAt
-
-    @@unique([variantId, size])  // one row per color+size
-    @@index([variantId])
-}
-
-
-
 // ─── Discount / Coupon system ─────────────────────────────────────────────────
 
 enum DiscountScope {
-    GLOBAL    // applies to entire cart
-    CATEGORY  // applies to items whose product.categoryId matches
-    PRODUCT   // applies to all variants of a specific product
-    VARIANT   // applies to exactly one variant
+    GLOBAL // applies to entire cart
+    CATEGORY // applies to items whose product.categoryId matches
+    PRODUCT // applies to all variants of a specific product
+    VARIANT // applies to exactly one variant
 }
 
 enum DiscountType {
-    PERCENT        // value = 1–100 (%)
-    AMOUNT         // value = öre
-    FREE_SHIPPING  // value ignored; discount = shippingCost
+    PERCENT // value = 1–100 (%)
+    AMOUNT // value = öre
+    FREE_SHIPPING // value ignored; discount = shippingCost
 }
 
 enum DiscountUsageType {
-    UNLIMITED   // e.g. campaign code FIRST10
-    SINGLE_USE  // e.g. unique printed voucher
-    MAX_USES    // shared code with a cap (maxUses)
+    UNLIMITED // e.g. campaign code FIRST10
+    SINGLE_USE // e.g. unique printed voucher
+    MAX_USES // shared code with a cap (maxUses)
 }
 
-/** Describes the rules of a discount campaign. One drive → many codes. */
+/**
+ * Describes the rules of a discount campaign. One drive → many codes.
+ */
 model DiscountDrive {
-    id            String         @id @default(cuid())
+    id            String        @id @default(cuid())
     name          String
     scopeType     DiscountScope
-    categoryId    String?        // set when scopeType=CATEGORY
-    productId     String?        // set when scopeType=PRODUCT
-    variantId     String?        // set when scopeType=VARIANT
+    categoryId    String? // set when scopeType=CATEGORY
+    productId     String? // set when scopeType=PRODUCT
+    variantId     String? // set when scopeType=VARIANT
     discountType  DiscountType
-    value         Int            // PERCENT 1–100, AMOUNT öre, FREE_SHIPPING 0
-    minOrderValue Int?           // min eligible subtotal in öre
-    active        Boolean        @default(true)
-    createdAt     DateTime       @default(now())
+    value         Int // PERCENT 1–100, AMOUNT öre, FREE_SHIPPING 0
+    minOrderValue Int? // min eligible subtotal in öre
+    active        Boolean       @default(true)
+    createdAt     DateTime      @default(now())
 
     codes DiscountCode[]
 
     @@index([active])
 }
 
-/** A code customers type in. Points to a DiscountDrive for the actual rules. */
+/**
+ * A code customers type in. Points to a DiscountDrive for the actual rules.
+ */
 model DiscountCode {
-    id        String             @id @default(cuid())
-    code      String             @unique
+    id        String            @id @default(cuid())
+    code      String            @unique
     driveId   String
-    drive     DiscountDrive      @relation(fields: [driveId], references: [id], onDelete: Cascade)
+    drive     DiscountDrive     @relation(fields: [driveId], references: [id], onDelete: Cascade)
     usageType DiscountUsageType
-    maxUses   Int?               // only relevant when usageType=MAX_USES
-    usedCount Int                @default(0)
-    usedAt    DateTime?          // set on first use (SINGLE_USE)
-    createdAt DateTime           @default(now())
+    maxUses   Int? // only relevant when usageType=MAX_USES
+    usedCount Int               @default(0)
+    usedAt    DateTime? // set on first use (SINGLE_USE)
+    createdAt DateTime          @default(now())
 
     @@index([driveId])
     @@index([code])
@@ -176,7 +157,7 @@ enum CheckoutOrderStatus {
     FULFILLED
     CANCELLED
     REFUNDED
-    PENDING_PAYMENT  // payment failed; customer can retry on same order
+    PENDING_PAYMENT // payment failed; customer can retry on same order
 }
 
 enum PaymentStatus {
@@ -199,21 +180,21 @@ enum OrderStatus {
 }
 
 model Order {
-    id              String          @id @default(cuid())
-    orderNumber     String          @unique // human-readable ORDER-YYYY-0001
-    publicToken     String          @unique // random 64-char hex; required for public polling (no-PII)
-    status          CheckoutOrderStatus @default(CREATED)
-    providerOrderId String?         @unique
+    id                String              @id @default(cuid())
+    orderNumber       String              @unique // human-readable ORDER-YYYY-0001
+    publicToken       String              @unique // random 64-char hex; required for public polling (no-PII)
+    status            CheckoutOrderStatus @default(CREATED)
+    providerOrderId   String?             @unique
     providerPaymentId String?
-    amountTotal     Int?
-    shippingAddress Json?
-    provider String @default("STRIPE")
-    klarnaOrderId   String?         @unique
-    paymentStatus   PaymentStatus   @default(PENDING)
-    orderStatus     OrderStatus     @default(NEW)
-    customerEmail String
-    customerName  String
-    customerPhone String?
+    amountTotal       Int?
+    shippingAddress   Json?
+    provider          String              @default("STRIPE")
+    klarnaOrderId     String?             @unique
+    paymentStatus     PaymentStatus       @default(PENDING)
+    orderStatus       OrderStatus         @default(NEW)
+    customerEmail     String
+    customerName      String
+    customerPhone     String?
 
     shippingAddressLine1 String
     shippingAddressLine2 String?
@@ -229,14 +210,14 @@ model Order {
     billingCity         String?
     billingCountry      String?
 
-    subtotal Int
-    shipping Int
-    discount Int         // total discount in öre
-    tax      Int
-    total    Int
-    currency String
-    appliedDiscountCode String?  // snapshot of code at time of order
-    appliedDriveId      String?  // snapshot of drive id
+    subtotal            Int
+    shipping            Int
+    discount            Int // total discount in öre
+    tax                 Int
+    total               Int
+    currency            String
+    appliedDiscountCode String? // snapshot of code at time of order
+    appliedDriveId      String? // snapshot of drive id
 
     createdAt    DateTime  @default(now())
     authorizedAt DateTime?
@@ -257,20 +238,20 @@ model Order {
 }
 
 model OrderItem {
-    id          Int     @id @default(autoincrement())
-    orderId     String
-    order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-    productId   String?
-    variantId   String?
-    productName String
-    variantName String?
-    sku         String?
-    quantity    Int
-    unitPrice   Int
-    lineTotal   Int
-    snapshotName String?
+    id                 Int     @id @default(autoincrement())
+    orderId            String
+    order              Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    productId          String?
+    variantId          String?
+    productName        String
+    variantName        String?
+    sku                String?
+    quantity           Int
+    unitPrice          Int
+    lineTotal          Int
+    snapshotName       String?
     snapshotUnitAmount Int?
-    snapshotImageUrl String?
+    snapshotImageUrl   String?
 }
 
 // Media library: folder hierarchy
@@ -340,18 +321,18 @@ enum OrderEventType {
 }
 
 model OrderEvent {
-    id             String          @id @default(cuid())
+    id             String         @id @default(cuid())
     type           OrderEventType
     orderId        String
-    order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
     payload        Json
-    idempotencyKey String          @unique
-    createdAt      DateTime        @default(now())
+    idempotencyKey String         @unique
+    createdAt      DateTime       @default(now())
     processedAt    DateTime?
-    attempts       Int             @default(0)
+    attempts       Int            @default(0)
     lastError      String?
-    lockedAt       DateTime?       // Lease-lock timestamp
-    lockedBy       String?         // Processor instance id that holds the lock
+    lockedAt       DateTime? // Lease-lock timestamp
+    lockedBy       String? // Processor instance id that holds the lock
 
     @@index([processedAt, createdAt])
     @@index([type, processedAt])

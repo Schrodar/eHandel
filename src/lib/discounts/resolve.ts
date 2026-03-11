@@ -30,8 +30,8 @@ export type AppliedToHint = {
 export type ResolveReason =
   | 'NOT_FOUND'
   | 'DRIVE_INACTIVE'
-  | 'CODE_EXHAUSTED'           // SINGLE_USE already used, or MAX_USES reached
-  | 'NOT_APPLICABLE_TO_CART'   // scope doesn't match any item in cart
+  | 'CODE_EXHAUSTED' // SINGLE_USE already used, or MAX_USES reached
+  | 'NOT_APPLICABLE_TO_CART' // scope doesn't match any item in cart
   | 'MIN_ORDER_NOT_MET';
 
 export type ResolveDiscountResult =
@@ -40,7 +40,7 @@ export type ResolveDiscountResult =
       code: string;
       driveId: string;
       driveName: string;
-      discountAmount: number;         // öre ≥ 0, ≤ eligibleSubtotal
+      discountAmount: number; // öre ≥ 0, ≤ eligibleSubtotal
       shippingDiscountAmount: number; // öre — for FREE_SHIPPING
       eligibleSubtotal: number;
       appliedToHint: AppliedToHint;
@@ -49,8 +49,8 @@ export type ResolveDiscountResult =
       valid: false;
       reason: ResolveReason;
       appliedToHint?: AppliedToHint; // present when NOT_APPLICABLE_TO_CART
-      requiredMinOrder?: number;     // present when MIN_ORDER_NOT_MET
-      eligibleSubtotal?: number;     // present when MIN_ORDER_NOT_MET
+      requiredMinOrder?: number; // present when MIN_ORDER_NOT_MET
+      eligibleSubtotal?: number; // present when MIN_ORDER_NOT_MET
     };
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -61,7 +61,8 @@ function isCodeExhausted(code: {
   usedCount: number;
   maxUses: number | null;
 }): boolean {
-  if (code.usageType === DiscountUsageType.SINGLE_USE && code.usedAt !== null) return true;
+  if (code.usageType === DiscountUsageType.SINGLE_USE && code.usedAt !== null)
+    return true;
   if (
     code.usageType === DiscountUsageType.MAX_USES &&
     code.maxUses !== null &&
@@ -146,7 +147,8 @@ export async function resolveDiscountForCart(params: {
   const { drive } = discountCode;
 
   if (!drive.active) return { valid: false, reason: 'DRIVE_INACTIVE' };
-  if (isCodeExhausted(discountCode)) return { valid: false, reason: 'CODE_EXHAUSTED' };
+  if (isCodeExhausted(discountCode))
+    return { valid: false, reason: 'CODE_EXHAUSTED' };
 
   // 2. Resolve labels for UI hint (lightweight individual lookups)
   let categoryName: string | null = null;
@@ -201,10 +203,17 @@ export async function resolveDiscountForCart(params: {
   });
 
   if (eligibleLines.length === 0) {
-    return { valid: false, reason: 'NOT_APPLICABLE_TO_CART', appliedToHint: hint };
+    return {
+      valid: false,
+      reason: 'NOT_APPLICABLE_TO_CART',
+      appliedToHint: hint,
+    };
   }
 
-  const eligibleSubtotal = eligibleLines.reduce((sum, l) => sum + l.lineTotal, 0);
+  const eligibleSubtotal = eligibleLines.reduce(
+    (sum, l) => sum + l.lineTotal,
+    0,
+  );
 
   // 4. Check min order value (on eligible subtotal only)
   if (drive.minOrderValue != null && eligibleSubtotal < drive.minOrderValue) {
@@ -236,7 +245,10 @@ export async function resolveDiscountForCart(params: {
 
   // Clamp
   discountAmount = Math.min(Math.max(0, discountAmount), eligibleSubtotal);
-  shippingDiscountAmount = Math.min(Math.max(0, shippingDiscountAmount), shippingCost);
+  shippingDiscountAmount = Math.min(
+    Math.max(0, shippingDiscountAmount),
+    shippingCost,
+  );
 
   return {
     valid: true,
@@ -256,9 +268,7 @@ export async function resolveDiscountForCart(params: {
  * Convert client-sent `[{ variantId, quantity }]` to server-authoritative
  * ResolveCartLine[] by looking up prices and category from the DB.
  *
- * Supports two ID shapes:
- *  - ProductVariant.id  (legacy / no-size products)
- *  - VariantSize.id     (new model: one purchasable row per color+size)
+ * Supports ProductVariant IDs only.
  */
 export async function buildCartLinesFromVariantIds(
   input: Array<{ variantId: string; quantity: number }>,
@@ -266,74 +276,24 @@ export async function buildCartLinesFromVariantIds(
   const ids = input.map((i) => i.variantId).filter(Boolean);
   if (!ids.length) return [];
 
-  // 1. Try ProductVariant lookup first (legacy path)
   const variants = await prisma.productVariant.findMany({
     where: { id: { in: ids }, active: true },
     include: {
       product: {
-        select: { id: true, categoryId: true, priceInCents: true, published: true },
+        select: {
+          id: true,
+          categoryId: true,
+          priceInCents: true,
+          published: true,
+        },
       },
     },
   });
   const byVariantId = new Map(variants.map((v) => [v.id, v]));
 
-  // 2. IDs not found as ProductVariant may be VariantSize IDs (new model)
-  const unresolvedIds = ids.filter((id) => !byVariantId.has(id));
-  type SzInfo = {
-    sizePrice: number | null;
-    parentPrice: number | null;
-    productId: string;
-    categoryId: string;
-    productPrice: number | null;
-    published: boolean;
-  };
-  const bySizeId = new Map<string, SzInfo>();
-
-  if (unresolvedIds.length > 0) {
-    const variantSizes = await prisma.variantSize.findMany({
-      where: { id: { in: unresolvedIds }, active: true },
-      include: {
-        variant: {
-          include: {
-            product: {
-              select: { id: true, categoryId: true, priceInCents: true, published: true },
-            },
-          },
-        },
-      },
-    });
-    for (const sz of variantSizes) {
-      bySizeId.set(sz.id, {
-        sizePrice: sz.priceInCents,
-        parentPrice: sz.variant.priceInCents,
-        productId: sz.variant.product.id,
-        categoryId: sz.variant.product.categoryId,
-        productPrice: sz.variant.product.priceInCents,
-        published: sz.variant.product.published,
-      });
-    }
-  }
-
   return input.flatMap((item) => {
     const qty = Math.max(1, Math.floor(item.quantity));
 
-    // New model: VariantSize ID
-    const sz = bySizeId.get(item.variantId);
-    if (sz) {
-      if (!sz.published) return [];
-      const unitPrice = sz.sizePrice ?? sz.parentPrice ?? sz.productPrice ?? 0;
-      if (unitPrice <= 0) return [];
-      return [
-        {
-          variantId: item.variantId,
-          productId: sz.productId,
-          categoryId: sz.categoryId,
-          lineTotal: unitPrice * qty,
-        },
-      ];
-    }
-
-    // Legacy: ProductVariant ID
     const variant = byVariantId.get(item.variantId);
     if (!variant || !variant.product.published) return [];
     const unitPrice = variant.priceInCents ?? variant.product.priceInCents ?? 0;
@@ -367,33 +327,46 @@ export async function markDiscountCodeUsed(
   });
 
   if (!discountCode) {
-    console.warn(`[Discounts] markDiscountCodeUsed: code "${normalizedCode}" not found`);
+    console.warn(
+      `[Discounts] markDiscountCodeUsed: code "${normalizedCode}" not found`,
+    );
     return;
   }
 
   switch (discountCode.usageType) {
     case DiscountUsageType.SINGLE_USE: {
       if (discountCode.usedAt !== null) {
-        console.log(`[Discounts] SINGLE_USE ${normalizedCode} already marked (replay ok)`);
+        console.log(
+          `[Discounts] SINGLE_USE ${normalizedCode} already marked (replay ok)`,
+        );
         return;
       }
       await prisma.discountCode.update({
         where: { id: discountCode.id },
         data: { usedAt: new Date(), usedCount: { increment: 1 } },
       });
-      console.log(`[Discounts] SINGLE_USE ${normalizedCode} used by order ${orderId}`);
+      console.log(
+        `[Discounts] SINGLE_USE ${normalizedCode} used by order ${orderId}`,
+      );
       break;
     }
     case DiscountUsageType.MAX_USES: {
-      if (discountCode.maxUses !== null && discountCode.usedCount >= discountCode.maxUses) {
-        console.log(`[Discounts] MAX_USES ${normalizedCode} already exhausted (replay ok)`);
+      if (
+        discountCode.maxUses !== null &&
+        discountCode.usedCount >= discountCode.maxUses
+      ) {
+        console.log(
+          `[Discounts] MAX_USES ${normalizedCode} already exhausted (replay ok)`,
+        );
         return;
       }
       await prisma.discountCode.update({
         where: { id: discountCode.id },
         data: { usedCount: { increment: 1 } },
       });
-      console.log(`[Discounts] MAX_USES ${normalizedCode} counted for order ${orderId}`);
+      console.log(
+        `[Discounts] MAX_USES ${normalizedCode} counted for order ${orderId}`,
+      );
       break;
     }
     case DiscountUsageType.UNLIMITED: {
@@ -401,7 +374,9 @@ export async function markDiscountCodeUsed(
         where: { id: discountCode.id },
         data: { usedCount: { increment: 1 } },
       });
-      console.log(`[Discounts] UNLIMITED ${normalizedCode} usage counted for order ${orderId}`);
+      console.log(
+        `[Discounts] UNLIMITED ${normalizedCode} usage counted for order ${orderId}`,
+      );
       break;
     }
   }
