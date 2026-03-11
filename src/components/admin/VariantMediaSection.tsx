@@ -59,6 +59,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isLoadingToggle, setIsLoadingToggle] = useState(false);
   const [isSavingImage, setIsSavingImage] = useState(false);
+  const [isRemovingImage, setIsRemovingImage] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const primaryImage = getPrimaryImage(variant);
@@ -66,6 +67,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
   const isActivating = isLoadingToggle && !variant.active;
 
   const handleToggleActive = async () => {
+    if (isLoadingToggle) return;
     if (activationStatus.status === 'blocked') {
       setError(`Kan inte aktivera: ${activationStatus.reason}`);
       return;
@@ -108,12 +110,16 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
   };
 
   const handleRemoveImage = async (assetId: string) => {
+    if (isRemovingImage) return;
+    setIsRemovingImage(true);
     setError(null);
     try {
       await removeVariantImageAction(variant.id, assetId);
       onSuccess?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kunde inte ta bort bild');
+    } finally {
+      setIsRemovingImage(false);
     }
   };
 
@@ -149,18 +155,18 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
             <button
               type="button"
               onClick={() => setIsPickerOpen(true)}
-              disabled={isSavingImage}
+              disabled={isSavingImage || isRemovingImage}
               className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
-              Ersätt bild
+              {isSavingImage ? 'Sparar…' : 'Ersätt bild'}
             </button>
             <button
               type="button"
               onClick={() => handleRemoveImage(primaryImage.id)}
-              disabled={isSavingImage}
+              disabled={isSavingImage || isRemovingImage}
               className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50"
             >
-              Ta bort bild
+              {isRemovingImage ? 'Tar bort…' : 'Ta bort bild'}
             </button>
           </div>
         </div>
@@ -172,7 +178,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
           <button
             type="button"
             onClick={() => setIsPickerOpen(true)}
-            disabled={isSavingImage}
+            disabled={isSavingImage || isRemovingImage}
             className="rounded-full bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {isSavingImage ? 'Sparar…' : 'Välj bild'}
@@ -186,9 +192,7 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
         <button
           type="button"
           onClick={handleToggleActive}
-          disabled={
-            isLoadingToggle || activationStatus.status === 'blocked'
-          }
+          disabled={isLoadingToggle || activationStatus.status === 'blocked'}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
             variant.active ? 'bg-emerald-600' : 'bg-slate-300'
           } ${
@@ -204,7 +208,13 @@ export default function VariantMediaSection({ variant, onSuccess }: Props) {
           />
         </button>
         <span className="text-xs text-slate-600">
-          {variant.active ? 'Aktiv' : 'Inaktiv'}
+          {isLoadingToggle
+            ? variant.active
+              ? 'Inaktiverar…'
+              : 'Aktiverar…'
+            : variant.active
+              ? 'Aktiv'
+              : 'Inaktiv'}
         </span>
         {isActivating && (
           <span className="inline-flex items-center gap-2 text-xs text-slate-600">

@@ -13,6 +13,7 @@ import {
   createVariant,
   deleteProduct,
   publishProduct,
+  toggleVariantActive,
   unpublishProduct,
   updateProduct,
   updateVariant,
@@ -190,12 +191,12 @@ export default async function AdminProductDetailPage({
             confirmMessage="Ar du saker pa att du vill ta bort denna produkt? Detta gar inte att angra."
           >
             <input type="hidden" name="id" value={product.id} />
-            <button
-              type="submit"
+            <SubmitButton
               className="w-full rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-center text-xs font-medium text-rose-700 hover:bg-rose-100 md:w-auto"
+              pendingLabel="Tar bort…"
             >
               Ta bort
-            </button>
+            </SubmitButton>
           </AdminForm>
           {product.published ? (
             <AdminForm
@@ -205,12 +206,12 @@ export default async function AdminProductDetailPage({
               showOverlay={false}
             >
               <input type="hidden" name="id" value={product.id} />
-              <button
-                type="submit"
+              <SubmitButton
                 className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-xs font-medium text-slate-800 hover:bg-slate-50 md:w-auto"
+                pendingLabel="Avpublicerar…"
               >
                 Unpublish
-              </button>
+              </SubmitButton>
             </AdminForm>
           ) : (
             <AdminForm
@@ -220,12 +221,12 @@ export default async function AdminProductDetailPage({
               showOverlay={false}
             >
               <input type="hidden" name="id" value={product.id} />
-              <button
-                type="submit"
+              <SubmitButton
                 className="w-full rounded-full bg-emerald-600 px-4 py-2 text-center text-xs font-medium text-white hover:bg-emerald-700 md:w-auto"
+                pendingLabel="Publicerar…"
               >
                 Publish
-              </button>
+              </SubmitButton>
             </AdminForm>
           )}
         </div>
@@ -487,6 +488,15 @@ export default async function AdminProductDetailPage({
                 )}
               </ul>
             </section>
+
+            <div className="flex justify-end border-t border-slate-200 pt-4">
+              <SubmitButton
+                className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+                pendingLabel="Sparar…"
+              >
+                Spara ändringar
+              </SubmitButton>
+            </div>
           </AdminForm>
 
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
@@ -498,12 +508,12 @@ export default async function AdminProductDetailPage({
                 showOverlay={false}
               >
                 <input type="hidden" name="id" value={product.id} />
-                <button
-                  type="submit"
+                <SubmitButton
                   className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+                  pendingLabel="Avpublicerar…"
                 >
                   Unpublish
-                </button>
+                </SubmitButton>
               </AdminForm>
             ) : (
               <AdminForm
@@ -513,22 +523,14 @@ export default async function AdminProductDetailPage({
                 showOverlay={false}
               >
                 <input type="hidden" name="id" value={product.id} />
-                <button
-                  type="submit"
+                <SubmitButton
                   className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  pendingLabel="Publicerar…"
                 >
                   Publish
-                </button>
+                </SubmitButton>
               </AdminForm>
             )}
-
-            <button
-              type="submit"
-              form="product-update-form"
-              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Spara ändringar
-            </button>
           </div>
         </div>
       )}
@@ -720,10 +722,37 @@ export default async function AdminProductDetailPage({
                         </div>
 
                         <div className="mt-4 grid grid-cols-2 gap-2">
+                          <AdminForm
+                            action={toggleVariantActive}
+                            className="col-span-2"
+                            toastMessage="Status uppdaterad"
+                            pendingMessage="Uppdaterar status…"
+                            showOverlay={false}
+                          >
+                            <input type="hidden" name="id" value={v.id} />
+                            <input
+                              type="hidden"
+                              name="productId"
+                              value={product.id}
+                            />
+                            <SubmitButton
+                              className={
+                                v.active
+                                  ? 'w-full rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60'
+                                  : 'w-full rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60'
+                              }
+                              pendingLabel="Uppdaterar…"
+                            >
+                              {v.active ? 'Inaktivera' : 'Aktivera'}
+                            </SubmitButton>
+                          </AdminForm>
                           {!isEditing && product.defaultVariantId !== v.id && (
-                            <form
+                            <AdminForm
                               action={setDefaultVariant}
                               className="contents"
+                              toastMessage="Standardvariant satt"
+                              pendingMessage="Uppdaterar…"
+                              showOverlay={false}
                             >
                               <input
                                 type="hidden"
@@ -735,13 +764,13 @@ export default async function AdminProductDetailPage({
                                 name="variantId"
                                 value={v.id}
                               />
-                              <button
-                                type="submit"
+                              <SubmitButton
                                 className="rounded-full bg-blue-50 px-4 py-2 text-center text-sm font-medium text-blue-700 hover:bg-blue-100"
+                                pendingLabel="Sätter…"
                               >
                                 Set as default
-                              </button>
-                            </form>
+                              </SubmitButton>
+                            </AdminForm>
                           )}
                           {isEditing ? (
                             <Link
@@ -787,7 +816,7 @@ export default async function AdminProductDetailPage({
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <AdminForm
                               action={updateVariant}
-                              className="grid gap-3 md:grid-cols-3"
+                              className="grid gap-3 md:grid-cols-4"
                               toastMessage="Sparat"
                               pendingMessage="Sparar…"
                               showOverlay={false}
@@ -797,6 +826,11 @@ export default async function AdminProductDetailPage({
                                 type="hidden"
                                 name="productId"
                                 value={product.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="stock"
+                                value={v.stock}
                               />
 
                               <div>
@@ -832,6 +866,19 @@ export default async function AdminProductDetailPage({
 
                               <div>
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Size
+                                </label>
+                                <input
+                                  type="text"
+                                  name="size"
+                                  defaultValue={v.size ?? ''}
+                                  placeholder="Valfri storlek"
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                   Price (SEK)
                                 </label>
                                 <input
@@ -844,11 +891,11 @@ export default async function AdminProductDetailPage({
                                 />
                               </div>
 
-                              <div className="md:col-span-3">
+                              <div className="md:col-span-4">
                                 <VariantMediaSection variant={v} />
                               </div>
 
-                              <div className="flex items-end justify-end gap-2 md:col-span-3">
+                              <div className="flex items-end justify-end gap-2 md:col-span-4">
                                 <Link
                                   href={cancelHref}
                                   className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -954,23 +1001,41 @@ export default async function AdminProductDetailPage({
                               </div>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <span
-                                className={
-                                  v.active
-                                    ? 'inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700'
-                                    : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700'
-                                }
+                              <AdminForm
+                                action={toggleVariantActive}
+                                className="inline"
+                                toastMessage="Status uppdaterad"
+                                pendingMessage="Uppdaterar status…"
+                                showOverlay={false}
                               >
-                                {v.active ? 'Active' : 'Inactive'}
-                              </span>
+                                <input type="hidden" name="id" value={v.id} />
+                                <input
+                                  type="hidden"
+                                  name="productId"
+                                  value={product.id}
+                                />
+                                <SubmitButton
+                                  className={
+                                    v.active
+                                      ? 'inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60'
+                                      : 'inline-flex rounded-full border border-slate-200 bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-60'
+                                  }
+                                  pendingLabel="Uppdaterar…"
+                                >
+                                  {v.active ? 'Active' : 'Inactive'}
+                                </SubmitButton>
+                              </AdminForm>
                             </td>
                             <td className="px-3 py-2 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 {!isEditing &&
                                   product.defaultVariantId !== v.id && (
-                                    <form
+                                    <AdminForm
                                       action={setDefaultVariant}
                                       className="inline"
+                                      toastMessage="Standardvariant satt"
+                                      pendingMessage="Uppdaterar…"
+                                      showOverlay={false}
                                     >
                                       <input
                                         type="hidden"
@@ -982,13 +1047,13 @@ export default async function AdminProductDetailPage({
                                         name="variantId"
                                         value={v.id}
                                       />
-                                      <button
-                                        type="submit"
+                                      <SubmitButton
                                         className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 hover:bg-blue-100"
+                                        pendingLabel="Sätter…"
                                       >
                                         Set
-                                      </button>
-                                    </form>
+                                      </SubmitButton>
+                                    </AdminForm>
                                   )}
                                 {isEditing ? (
                                   <Link
@@ -1031,7 +1096,7 @@ export default async function AdminProductDetailPage({
                               <td colSpan={8} className="px-3 py-3 bg-slate-50">
                                 <AdminForm
                                   action={updateVariant}
-                                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-3"
+                                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4"
                                   toastMessage="Sparat"
                                   pendingMessage="Sparar…"
                                   showOverlay={false}
@@ -1041,6 +1106,11 @@ export default async function AdminProductDetailPage({
                                     type="hidden"
                                     name="productId"
                                     value={product.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="stock"
+                                    value={v.stock}
                                   />
 
                                   <div>
@@ -1076,6 +1146,19 @@ export default async function AdminProductDetailPage({
 
                                   <div>
                                     <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                      Size
+                                    </label>
+                                    <input
+                                      type="text"
+                                      name="size"
+                                      defaultValue={v.size ?? ''}
+                                      placeholder="Valfri storlek"
+                                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                       Price (SEK)
                                     </label>
                                     <input
@@ -1088,11 +1171,11 @@ export default async function AdminProductDetailPage({
                                     />
                                   </div>
 
-                                  <div className="sm:col-span-3">
+                                  <div className="sm:col-span-4">
                                     <VariantMediaSection variant={v} />
                                   </div>
 
-                                  <div className="flex items-end justify-end gap-2 sm:col-span-3">
+                                  <div className="flex items-end justify-end gap-2 sm:col-span-4">
                                     <Link
                                       href={cancelHref}
                                       className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"

@@ -176,6 +176,8 @@ function parsePriceSek(
   return Math.round(parsed * 100);
 }
 
+const MAX_VARIANT_SIZE_LENGTH = 32;
+
 export async function createProduct(formData: FormData) {
   await assertAdmin();
 
@@ -195,6 +197,7 @@ export async function createProduct(formData: FormData) {
     ((formData.get('priceClass') as string | null) || '').trim() || 'standard';
   const season =
     ((formData.get('season') as string | null) || '').trim() || 'all';
+  const priceSekRaw = (formData.get('priceSek') as string | null) ?? null;
   // Publishing is handled via the explicit Publish action, after variants exist.
   const next = ((formData.get('next') as string | null) || 'overview').trim();
 
@@ -206,6 +209,11 @@ export async function createProduct(formData: FormData) {
   }
   if (!materialId) {
     errors.materialId = 'Material är obligatoriskt';
+  }
+
+  let priceInCents: number | null = null;
+  if (priceSekRaw && priceSekRaw.trim()) {
+    priceInCents = parsePriceSek(priceSekRaw, errors, 'priceSek');
   }
 
   const slug = rawSlug || slugify(name);
@@ -231,6 +239,7 @@ export async function createProduct(formData: FormData) {
       description,
       categoryId,
       materialId,
+      priceInCents,
       priceClass,
       season,
       published: false,
@@ -273,6 +282,7 @@ export async function updateProduct(formData: FormData) {
     ((formData.get('priceClass') as string | null) || '').trim() || 'standard';
   const season =
     ((formData.get('season') as string | null) || '').trim() || 'all';
+  const priceSekRaw = (formData.get('priceSek') as string | null) ?? null;
 
   if (!name) {
     errors.name = 'Namn är obligatoriskt';
@@ -282,6 +292,11 @@ export async function updateProduct(formData: FormData) {
   }
   if (!materialId) {
     errors.materialId = 'Material är obligatoriskt';
+  }
+
+  let priceInCents: number | null = null;
+  if (priceSekRaw && priceSekRaw.trim()) {
+    priceInCents = parsePriceSek(priceSekRaw, errors, 'priceSek');
   }
 
   const slug = rawSlug || slugify(name);
@@ -306,6 +321,7 @@ export async function updateProduct(formData: FormData) {
       description,
       categoryId,
       materialId,
+      priceInCents,
       priceClass,
       season,
     },
@@ -431,6 +447,9 @@ export async function createVariant(formData: FormData) {
   if (!Number.isInteger(stock) || stock < 0) {
     errors.stock = 'Stock måste vara ett heltal ≥ 0';
   }
+  if (size && size.length > MAX_VARIANT_SIZE_LENGTH) {
+    errors.size = `Size får vara max ${MAX_VARIANT_SIZE_LENGTH} tecken`;
+  }
 
   let priceInCents: number | null = null;
   if (priceOverrideSekRaw && priceOverrideSekRaw.trim()) {
@@ -541,6 +560,9 @@ export async function updateVariant(formData: FormData) {
   const stock = Number(stockRaw);
   if (!Number.isInteger(stock) || stock < 0) {
     errors.stock = 'Stock måste vara ett heltal ≥ 0';
+  }
+  if (size && size.length > MAX_VARIANT_SIZE_LENGTH) {
+    errors.size = `Size får vara max ${MAX_VARIANT_SIZE_LENGTH} tecken`;
   }
 
   let priceInCents: number | null = null;

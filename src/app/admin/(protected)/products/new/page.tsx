@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { createProduct } from '../actions';
+import { SubmitButton } from '@/components/admin/SubmitButton';
 
 export const metadata = {
   title: 'Admin – Skapa produkt',
@@ -168,22 +169,22 @@ export default async function NewProductPage() {
             Avbryt
           </Link>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <button
-              type="submit"
+            <SubmitButton
               name="next"
               value="overview"
               className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 sm:w-auto"
+              pendingLabel="Sparar…"
             >
               Spara
-            </button>
-            <button
-              type="submit"
+            </SubmitButton>
+            <SubmitButton
               name="next"
               value="variants"
               className="w-full rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 sm:w-auto"
+              pendingLabel="Sparar…"
             >
               Spara &amp; lägg till varianter
-            </button>
+            </SubmitButton>
           </div>
         </div>
       </form>

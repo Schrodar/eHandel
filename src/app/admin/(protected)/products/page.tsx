@@ -3,7 +3,11 @@ import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
 import AdminForm from '@/components/admin/AdminForm';
-import { getProductCardImage, type ProductForCardImage } from '@/lib/productCardImage';
+import { SubmitButton } from '@/components/admin/SubmitButton';
+import {
+  getProductCardImage,
+  type ProductForCardImage,
+} from '@/lib/productCardImage';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -134,7 +138,7 @@ function MobileProductListAccordion({
                   <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     Slug
                   </dt>
-                  <dd className="mt-0.5 break-words font-mono text-[11px] text-slate-700">
+                  <dd className="mt-0.5 wrap-break-word font-mono text-[11px] text-slate-700">
                     {p.slug}
                   </dd>
                 </div>
@@ -142,7 +146,7 @@ function MobileProductListAccordion({
                   <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                     ID
                   </dt>
-                  <dd className="mt-0.5 break-words font-mono text-[11px] text-slate-700">
+                  <dd className="mt-0.5 wrap-break-word font-mono text-[11px] text-slate-700">
                     {p.id}
                   </dd>
                 </div>
@@ -184,12 +188,12 @@ function MobileProductListAccordion({
                   showOverlay
                 >
                   <input type="hidden" name="id" value={p.id} />
-                  <button
-                    type="submit"
+                  <SubmitButton
                     className="w-full rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100"
+                    pendingLabel="Tar bort…"
                   >
                     Delete
-                  </button>
+                  </SubmitButton>
                 </AdminForm>
               </div>
             </div>
@@ -560,7 +564,9 @@ export default async function AdminProductsPage({
                   const activeCount = stats?.activeCount ?? 0;
                   const minActiveStock = stats?.minActiveStock ?? null;
                   const hasProblem = p.published && activeCount === 0;
-                  const imageUrl = getProductCardImage(p as ProductForCardImage);
+                  const imageUrl = getProductCardImage(
+                    p as ProductForCardImage,
+                  );
 
                   return (
                     <tr
