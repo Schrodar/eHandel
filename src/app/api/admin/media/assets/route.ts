@@ -38,7 +38,13 @@ export async function GET(req: NextRequest) {
 
     const assets = await prisma.asset.findMany({
       where: Object.keys(where).length > 0 ? where : undefined,
-      include: {
+      select: {
+        id: true,
+        url: true,
+        alt: true,
+        width: true,
+        height: true,
+        createdAt: true,
         folders: {
           select: { folderId: true },
         },

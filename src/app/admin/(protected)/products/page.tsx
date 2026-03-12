@@ -1,5 +1,3 @@
-import { prisma } from '@/lib/prisma';
-import { Prisma } from '@prisma/client';
 import Link from 'next/link';
 import { deleteProduct } from './actions';
 import AdminForm from '@/components/admin/AdminForm';
@@ -8,6 +6,11 @@ import {
   getProductCardImage,
   type ProductForCardImage,
 } from '@/lib/productCardImage';
+import {
+  getAdminProductsPageData,
+  type AdminProductRow,
+  type VariantStats,
+} from '@/lib/admin/productsService';
 
 export const metadata = {
   title: 'Admin – Products',
@@ -38,40 +41,7 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-// PERF: lean image select — only the primary image url is needed for card thumbnails.
-// Previously this loaded all Asset fields (8 cols) for every image of every variant.
-type ProductRow = Prisma.ProductGetPayload<{
-  select: {
-    id: true;
-    name: true;
-    slug: true;
-    published: true;
-    defaultVariantId: true;
-    category: { select: { id: true; name: true } };
-    material: { select: { id: true; name: true } };
-    _count: { select: { variants: true } };
-    defaultVariant: {
-      select: {
-        variantImages: {
-          select: { role: true; asset: { select: { url: true } } };
-        };
-      };
-    };
-    variants: {
-      select: {
-        active: true;
-        variantImages: {
-          select: { role: true; asset: { select: { url: true } } };
-        };
-      };
-    };
-  };
-}>;
-
-type VariantStats = {
-  activeCount: number;
-  minActiveStock: number | null;
-};
+type ProductRow = AdminProductRow;
 
 function MobileProductListAccordion({
   products,
@@ -171,12 +141,14 @@ function MobileProductListAccordion({
               <div className="mt-4 grid grid-cols-1 gap-2">
                 <Link
                   href={`/admin/products/${p.id}`}
+                  prefetch={false}
                   className="w-full rounded-full bg-slate-900 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
                 >
                   Edit
                 </Link>
                 <Link
                   href={`/product/${p.slug}`}
+                  prefetch={false}
                   className="w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Preview
@@ -226,41 +198,6 @@ export default async function AdminProductsPage({
     100,
   );
 
-  const where: Prisma.ProductWhereInput = {};
-
-  if (q) {
-    where.OR = [
-      { name: { contains: q, mode: 'insensitive' } },
-      { slug: { contains: q, mode: 'insensitive' } },
-      { id: { contains: q, mode: 'insensitive' } },
-    ];
-  }
-
-  if (publishedFilter === 'published') {
-    where.published = true;
-  } else if (publishedFilter === 'draft') {
-    where.published = false;
-  }
-
-  if (categoryId) {
-    where.categoryId = categoryId;
-  }
-  if (materialId) {
-    where.materialId = materialId;
-  }
-  if (priceClass) {
-    where.priceClass = priceClass;
-  }
-  if (season) {
-    where.season = season;
-  }
-
-  let orderBy: Prisma.ProductOrderByWithRelationInput = { name: 'asc' };
-  if (sort === 'name-desc') {
-    orderBy = { name: 'desc' };
-  }
-  // "Senast ändrad" kräver timestamps i modellen och kan läggas till senare
-
   const {
     products,
     totalCount,
@@ -269,97 +206,21 @@ export default async function AdminProductsPage({
     skip,
     categories,
     materials,
-  } = await prisma.$transaction(async (tx) => {
-    const totalCount = await tx.product.count({ where });
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-    const effectivePage = clamp(requestedPage, 1, totalPages);
-    const skip = (effectivePage - 1) * pageSize;
-
-    const products = await tx.product.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        published: true,
-        defaultVariantId: true,
-        category: { select: { id: true, name: true } },
-        material: { select: { id: true, name: true } },
-        _count: { select: { variants: true } },
-        // PERF: select only role + url for the primary image per variant.
-        // Previously: include: { asset: true } fetched all 8 asset cols for every image of every variant.
-        // Now: where: {role:'primary'} + take:1 limits to at most 1 row per variant, with only url.
-        defaultVariant: {
-          select: {
-            variantImages: {
-              select: { role: true, asset: { select: { url: true } } },
-              where: { role: 'primary' },
-              take: 1,
-            },
-          },
-        },
-        variants: {
-          select: {
-            active: true,
-            variantImages: {
-              select: { role: true, asset: { select: { url: true } } },
-              where: { role: 'primary' },
-              take: 1,
-            },
-          },
-        },
-      },
-      orderBy,
-      skip,
-      take: pageSize,
-    });
-
-    const categories = await tx.category.findMany({ orderBy: { name: 'asc' } });
-    const materials = await tx.material.findMany({ orderBy: { name: 'asc' } });
-
-    return {
-      products,
-      totalCount,
-      totalPages,
-      effectivePage,
-      skip,
-      categories,
-      materials,
-    };
+    statsById,
+  } = await getAdminProductsPageData({
+    q,
+    publishedFilter:
+      publishedFilter === 'published' || publishedFilter === 'draft'
+        ? publishedFilter
+        : 'all',
+    categoryId,
+    materialId,
+    priceClass,
+    season,
+    sort: sort === 'name-desc' ? 'name-desc' : 'name-asc',
+    requestedPage,
+    pageSize,
   });
-
-  const productIds = products.map((p) => p.id);
-
-  const statsById: Record<string, VariantStats | undefined> =
-    Object.create(null);
-
-  if (productIds.length > 0) {
-    const activeAgg = await prisma.productVariant.groupBy({
-      by: ['productId'],
-      where: {
-        productId: { in: productIds },
-        active: true,
-      },
-      orderBy: { productId: 'asc' },
-      _count: { productId: true },
-      _min: { stock: true },
-    });
-
-    for (const row of activeAgg) {
-      const activeCount =
-        row._count &&
-        typeof row._count === 'object' &&
-        'productId' in row._count &&
-        typeof (row._count as { productId?: unknown }).productId === 'number'
-          ? ((row._count as { productId: number }).productId ?? 0)
-          : 0;
-
-      statsById[row.productId] = {
-        activeCount,
-        minActiveStock: row._min?.stock ?? null,
-      };
-    }
-  }
 
   const from = totalCount === 0 ? 0 : skip + 1;
   const to = Math.min(totalCount, skip + products.length);
@@ -392,12 +253,14 @@ export default async function AdminProductsPage({
         <div className="flex gap-2">
           <Link
             href="/shop"
+            prefetch={false}
             className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             Förhandsgranska shop
           </Link>
           <Link
             href="/admin/products/new"
+            prefetch={false}
             className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             + Skapa produkt
@@ -590,6 +453,7 @@ export default async function AdminProductsPage({
                       <td className="px-3 py-2 text-sm font-medium text-slate-900">
                         <Link
                           href={`/admin/products/${p.id}`}
+                          prefetch={false}
                           className="underline-offset-2 hover:underline"
                         >
                           {p.name}
@@ -634,12 +498,14 @@ export default async function AdminProductsPage({
                         <div className="flex justify-end gap-2">
                           <Link
                             href={`/product/${p.slug}`}
+                            prefetch={false}
                             className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                           >
                             Preview
                           </Link>
                           <Link
                             href={`/admin/products/${p.id}`}
+                            prefetch={false}
                             className="rounded-full border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
                           >
                             Edit
@@ -662,6 +528,7 @@ export default async function AdminProductsPage({
               {effectivePage > 1 ? (
                 <Link
                   href={makeHref(effectivePage - 1)}
+                  prefetch={false}
                   className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Föregående
@@ -674,6 +541,7 @@ export default async function AdminProductsPage({
               {effectivePage < totalPages ? (
                 <Link
                   href={makeHref(effectivePage + 1)}
+                  prefetch={false}
                   className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Nästa

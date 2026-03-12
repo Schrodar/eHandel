@@ -9,9 +9,6 @@ type AssetWithFolders = {
   width: number | null;
   height: number | null;
   createdAt: Date;
-  status: string;
-  type: string;
-  updatedAt: Date;
   folders: { folderId: string }[];
 };
 

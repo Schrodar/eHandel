@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { getAdminDashboardData } from '@/lib/admin/dashboardService';
 import Link from 'next/link';
 
 export const metadata = {
@@ -7,157 +7,12 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic';
 
-async function getKpis() {
-  const LOW_STOCK_THRESHOLD = 3;
-  const LIMIT = 50;
-
-  // PERF: was 8-query transaction + 1 separate round-trip to look up product names.
-  // Now: 7-query transaction. The old groupBy (no product names) + extra findMany
-  // for names has been replaced by a single findMany of activeVariants WITH product.name.
-  // lowStockVariantCount and lowStockProducts are derived in JS from the same data.
-  const [
-    publishedCount,
-    draftCount,
-    activeVariants,
-    publishedNoActiveVariants,
-    negativeStockVariants,
-    negativePriceVariants,
-    emptySkuVariants,
-  ] = await prisma.$transaction([
-    prisma.product.count({ where: { published: true } }),
-    prisma.product.count({ where: { published: false } }),
-    // Previously: groupBy (productId + _min stock) with no names → required a second
-    // findMany for product names. Now one query returns all needed data.
-    prisma.productVariant.findMany({
-      where: { active: true },
-      select: {
-        productId: true,
-        stock: true,
-        product: { select: { name: true } },
-      },
-      orderBy: { productId: 'asc' },
-    }),
-    prisma.product.findMany({
-      where: { published: true, variants: { none: { active: true } } },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-      take: LIMIT,
-    }),
-    prisma.productVariant.findMany({
-      where: { stock: { lt: 0 } },
-      select: {
-        id: true,
-        sku: true,
-        product: { select: { id: true, name: true } },
-      },
-      take: LIMIT,
-    }),
-    prisma.productVariant.findMany({
-      where: { priceInCents: { lt: 0 } },
-      select: {
-        id: true,
-        sku: true,
-        product: { select: { id: true, name: true } },
-      },
-      take: LIMIT,
-    }),
-    prisma.productVariant.findMany({
-      where: { sku: '' },
-      select: {
-        id: true,
-        sku: true,
-        product: { select: { id: true, name: true } },
-      },
-      take: LIMIT,
-    }),
-  ]);
-
-  // Aggregate active-variant data in JS: group by productId, pick min stock per product.
-  const productStockMap = new Map<string, { name: string; minStock: number }>();
-  for (const v of activeVariants) {
-    const existing = productStockMap.get(v.productId);
-    if (existing) {
-      existing.minStock = Math.min(existing.minStock, v.stock);
-    } else {
-      productStockMap.set(v.productId, {
-        name: v.product.name,
-        minStock: v.stock,
-      });
-    }
-  }
-
-  // Derived: count individual active variant rows with stock below threshold.
-  const lowStockVariantCount = activeVariants.filter(
-    (v) => v.stock < LOW_STOCK_THRESHOLD,
-  ).length;
-
-  const lowStockProducts: {
-    productId: string;
-    productName: string;
-    minStock: number;
-  }[] = [...productStockMap.entries()]
-    .filter(([, { minStock }]) => minStock < LOW_STOCK_THRESHOLD)
-    .map(([productId, { name, minStock }]) => ({
-      productId,
-      productName: name,
-      minStock,
-    }))
-    .slice(0, LIMIT);
-
-  const issues: {
-    productId: string;
-    productName: string;
-    type: string;
-  }[] = [];
-
-  for (const p of publishedNoActiveVariants) {
-    issues.push({
-      productId: p.id,
-      productName: p.name,
-      type: 'Published men har 0 aktiva varianter',
-    });
-  }
-
-  for (const v of negativeStockVariants) {
-    issues.push({
-      productId: v.product.id,
-      productName: v.product.name,
-      type: 'Variant har stock < 0',
-    });
-  }
-
-  for (const v of negativePriceVariants) {
-    issues.push({
-      productId: v.product.id,
-      productName: v.product.name,
-      type: 'Variant har negativt price override',
-    });
-  }
-
-  for (const v of emptySkuVariants) {
-    issues.push({
-      productId: v.product.id,
-      productName: v.product.name,
-      type: 'Variant har tom SKU',
-    });
-  }
-
-  return {
-    publishedCount,
-    draftCount,
-    lowStockCount: lowStockProducts.length,
-    lowStockVariantCount,
-    lowStockProducts,
-    issues: issues.slice(0, LIMIT),
-  };
-}
-
 export default async function AdminDashboardPage() {
   let kpis;
   let dbError: string | null = null;
   
   try {
-    kpis = await getKpis();
+    kpis = await getAdminDashboardData();
   } catch (err: unknown) {
     // If DATABASE_URL is placeholder or invalid, show setup UI instead of crashing
     dbError = err instanceof Error ? err.message : 'Database connection failed';
@@ -215,6 +70,7 @@ export default async function AdminDashboardPage() {
       >
         <Link
           href="/admin/products"
+          prefetch={false}
           className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-slate-300"
         >
           <div className="font-medium">Produkter</div>
@@ -224,6 +80,7 @@ export default async function AdminDashboardPage() {
         </Link>
         <Link
           href="/admin/categories"
+          prefetch={false}
           className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-slate-300"
         >
           <div className="font-medium">Kategorier</div>
@@ -231,6 +88,7 @@ export default async function AdminDashboardPage() {
         </Link>
         <Link
           href="/admin/materials"
+          prefetch={false}
           className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-slate-300"
         >
           <div className="font-medium">Material</div>
@@ -238,6 +96,7 @@ export default async function AdminDashboardPage() {
         </Link>
         <Link
           href="/admin/colors"
+          prefetch={false}
           className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-slate-300"
         >
           <div className="font-medium">Färger</div>
@@ -285,6 +144,7 @@ export default async function AdminDashboardPage() {
           <h2 className="text-sm font-semibold text-slate-900">Att åtgärda</h2>
           <Link
             href="/admin/products"
+            prefetch={false}
             className="text-xs font-medium text-slate-600 underline-offset-2 hover:underline"
           >
             Gå till produkthantering
@@ -312,6 +172,7 @@ export default async function AdminDashboardPage() {
                 </div>
                 <Link
                   href={`/admin/products/${issue.productId}`}
+                  prefetch={false}
                   className="text-xs font-medium text-slate-700 underline-offset-2 hover:underline"
                 >
                   Öppna
@@ -356,6 +217,7 @@ export default async function AdminDashboardPage() {
                   </div>
                   <Link
                     href={`/admin/products/${p.productId}?tab=variants`}
+                    prefetch={false}
                     className="text-xs font-medium text-slate-700 underline-offset-2 hover:underline"
                   >
                     Öppna

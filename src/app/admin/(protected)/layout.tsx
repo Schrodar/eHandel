@@ -44,6 +44,7 @@ export default async function AdminProtectedLayout({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 className="block rounded-md px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
               >
                 {item.label}

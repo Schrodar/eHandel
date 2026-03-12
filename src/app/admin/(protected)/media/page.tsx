@@ -30,7 +30,13 @@ export default async function MediaLibraryPage({ searchParams }: PageProps) {
 
   // Hämta assets
   const assetsRaw = await prisma.asset.findMany({
-    include: {
+    select: {
+      id: true,
+      url: true,
+      alt: true,
+      width: true,
+      height: true,
+      createdAt: true,
       folders: {
         select: { folderId: true },
       },
