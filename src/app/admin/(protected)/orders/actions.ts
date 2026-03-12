@@ -97,24 +97,21 @@ export async function startPicking(
   });
 
   try {
-    const updateResult = await prisma.$transaction(async (tx) => {
-      // Fail-fast on row locks instead of waiting ~30s (Netlify function timeout).
-      await tx.$executeRaw`SET LOCAL lock_timeout = '1500ms'`;
-
-      return tx.order.updateMany({
-        where: {
-          id: orderId,
-          orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
-          paymentStatus: PaymentStatus.CAPTURED,
-          status: {
-            notIn: [
-              CheckoutOrderStatus.PENDING_PAYMENT,
-              CheckoutOrderStatus.CANCELLED,
-            ],
-          },
+    // Atomic conditional update – no separate read-then-write, avoids row-lock contention.
+    // If another process already moved the order out of startable states the count will be 0.
+    const updateResult = await prisma.order.updateMany({
+      where: {
+        id: orderId,
+        orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
+        paymentStatus: PaymentStatus.CAPTURED,
+        status: {
+          notIn: [
+            CheckoutOrderStatus.PENDING_PAYMENT,
+            CheckoutOrderStatus.CANCELLED,
+          ],
         },
-        data: { orderStatus: OrderStatus.PICKING },
-      });
+      },
+      data: { orderStatus: OrderStatus.PICKING },
     });
 
     if (updateResult.count === 0) {
