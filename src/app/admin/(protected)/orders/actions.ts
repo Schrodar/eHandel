@@ -97,21 +97,28 @@ export async function startPicking(
   });
 
   try {
-    // Atomic conditional update – no separate read-then-write, avoids row-lock contention.
-    // If another process already moved the order out of startable states the count will be 0.
-    const updateResult = await prisma.order.updateMany({
-      where: {
-        id: orderId,
-        orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
-        paymentStatus: PaymentStatus.CAPTURED,
-        status: {
-          notIn: [
-            CheckoutOrderStatus.PENDING_PAYMENT,
-            CheckoutOrderStatus.CANCELLED,
-          ],
+    // Use an explicit transaction so SET LOCAL statement_timeout is scoped to
+    // this connection/transaction only. PgBouncer (transaction pooling) holds
+    // the connection for the lifetime of the transaction so SET LOCAL is safe.
+    // 6 000 ms gives enough room for a brief background lock while still
+    // failing well before Netlify's 30 s function timeout.
+    const updateResult = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL statement_timeout = '6000ms'`;
+
+      return tx.order.updateMany({
+        where: {
+          id: orderId,
+          orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
+          paymentStatus: PaymentStatus.CAPTURED,
+          status: {
+            notIn: [
+              CheckoutOrderStatus.PENDING_PAYMENT,
+              CheckoutOrderStatus.CANCELLED,
+            ],
+          },
         },
-      },
-      data: { orderStatus: OrderStatus.PICKING },
+        data: { orderStatus: OrderStatus.PICKING },
+      });
     });
 
     if (updateResult.count === 0) {
@@ -121,7 +128,7 @@ export async function startPicking(
       });
       return {
         ok: false,
-        message: 'Ordern uppdaterades inte (status kan ha ändrats av annan process)',
+        message: 'Ordern uppdaterades inte – status kan ha ändrats av en annan process.',
       };
     }
   } catch (error: unknown) {
@@ -132,14 +139,19 @@ export async function startPicking(
       message,
     });
 
-    if (message.toLowerCase().includes('lock timeout')) {
+    // statement_timeout fires when the update waits > 6 s on a row lock.
+    if (
+      message.toLowerCase().includes('statement timeout') ||
+      message.toLowerCase().includes('canceling statement') ||
+      message.toLowerCase().includes('lock timeout')
+    ) {
       return {
         ok: false,
-        message: 'Ordern är låst av en annan process. Försök igen om några sekunder.',
+        message: 'Ordern är tillfälligt låst av en annan process – försök igen om några sekunder.',
       };
     }
 
-    return { ok: false, message: 'Kunde inte starta plock just nu' };
+    return { ok: false, message: 'Kunde inte starta plock just nu.' };
   }
 
   console.info('[admin/orders/startPicking] db:update:done', {
