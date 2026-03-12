@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 
 export type VariantStats = {
   activeCount: number;
@@ -39,8 +40,8 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-function buildWhere(filters: AdminProductsFilters) {
-  const where = {} as Record<string, unknown>;
+function buildWhere(filters: AdminProductsFilters): Prisma.ProductWhereInput {
+  const where: Prisma.ProductWhereInput = {};
 
   if (filters.q) {
     where.OR = [
@@ -64,7 +65,9 @@ function buildWhere(filters: AdminProductsFilters) {
   return where;
 }
 
-function buildOrderBy(sort: AdminProductsFilters['sort']) {
+function buildOrderBy(
+  sort: AdminProductsFilters['sort'],
+): Prisma.ProductOrderByWithRelationInput {
   if (sort === 'name-desc') return { name: 'desc' };
   return { name: 'asc' };
 }

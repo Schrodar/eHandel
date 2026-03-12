@@ -43,11 +43,16 @@ function clamp(n: number, min: number, max: number): number {
 
 type ProductRow = AdminProductRow;
 
+type MobileProductRow = Pick<
+  AdminProductRow,
+  'id' | 'name' | 'slug' | 'published' | '_count'
+>;
+
 function MobileProductListAccordion({
   products,
   statsById,
 }: {
-  products: ProductRow[];
+  products: MobileProductRow[];
   statsById: Record<string, VariantStats | undefined>;
 }) {
   return (
@@ -224,6 +229,13 @@ export default async function AdminProductsPage({
 
   const from = totalCount === 0 ? 0 : skip + 1;
   const to = Math.min(totalCount, skip + products.length);
+  const mobileProducts: MobileProductRow[] = products.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    published: p.published,
+    _count: p._count,
+  }));
 
   const makeHref = (nextPage: number) => {
     const sp = new URLSearchParams();
@@ -401,7 +413,7 @@ export default async function AdminProductsPage({
       ) : (
         <>
           <MobileProductListAccordion
-            products={products}
+            products={mobileProducts}
             statsById={statsById}
           />
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white text-sm md:block">
