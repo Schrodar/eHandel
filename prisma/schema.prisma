@@ -228,6 +228,10 @@ model Order {
     confirmationEmailSentAt DateTime? // Set when order confirmation email is sent; used for idempotent email dispatch
     shippedEmailSentAt      DateTime? // Set when shipping notification email is sent; used for idempotent dispatch
 
+    // Admin-only fields
+    adminNote String? // Internal note visible only in administration
+    flagged   Boolean @default(false) // Flag order for follow-up
+
     items  OrderItem[]
     events OrderEvent[]
 
@@ -235,6 +239,7 @@ model Order {
     @@index([klarnaOrderId])
     @@index([paymentStatus])
     @@index([orderStatus])
+    @@index([shippedAt]) // History queries filter by shippedAt
 }
 
 model OrderItem {

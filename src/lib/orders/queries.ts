@@ -19,6 +19,11 @@ export type OrderListFilters = {
    * Default: false (main /admin/orders list).
    */
   includeFailed?: boolean;
+  /**
+   * When true, SHIPPED orders with shippedAt > 24 h ago are excluded.
+   * Default: true for the active orders list.
+   */
+  excludeOldShipped?: boolean;
 };
 
 export function normalizePage(value: number | undefined) {
@@ -34,6 +39,8 @@ export function normalizePageSize(value: number | undefined) {
 export async function listOrders(filters: OrderListFilters) {
   const page = normalizePage(filters.page);
   const pageSize = normalizePageSize(filters.pageSize);
+  // Default: exclude SHIPPED orders older than 24 h (they live in Orderhistorik).
+  const excludeOldShipped = filters.excludeOldShipped ?? true;
 
   const where: Prisma.OrderWhereInput = {};
 
@@ -44,6 +51,19 @@ export async function listOrders(filters: OrderListFilters) {
     where.NOT = [
       { paymentStatus: PaymentStatus.FAILED },
       { status: CheckoutOrderStatus.PENDING_PAYMENT },
+    ];
+  }
+
+  // Exclude SHIPPED orders older than 24 h from the active list unless an
+  // explicit orderStatus filter is set (user explicitly wants to see SHIPPED).
+  if (excludeOldShipped && !filters.orderStatus) {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    where.NOT = [
+      ...(Array.isArray(where.NOT) ? where.NOT : where.NOT ? [where.NOT] : []),
+      {
+        orderStatus: OrderStatus.SHIPPED,
+        shippedAt: { lt: cutoff },
+      },
     ];
   }
 
@@ -64,13 +84,14 @@ export async function listOrders(filters: OrderListFilters) {
 
   const query = filters.query?.trim();
   if (query) {
-where.OR = [
-  { orderNumber: { contains: query } },
-  { id: { contains: query } },
-  { customerEmail: { contains: query } },
-  { klarnaOrderId: { contains: query } },
-];
-
+    where.OR = [
+      { orderNumber: { contains: query, mode: 'insensitive' } },
+      { id: { contains: query, mode: 'insensitive' } },
+      { customerEmail: { contains: query, mode: 'insensitive' } },
+      { customerName: { contains: query, mode: 'insensitive' } },
+      { customerPhone: { contains: query, mode: 'insensitive' } },
+      { klarnaOrderId: { contains: query } },
+    ];
   }
 
   const [orders, total] = await prisma.$transaction([
