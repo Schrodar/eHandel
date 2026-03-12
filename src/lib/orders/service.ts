@@ -45,9 +45,31 @@ export async function capturePayment(
 ): Promise<CapturePaymentResult> {
   const idempotencyKey = `${orderId}:ORDER_PAID`;
 
+  // ── Fast-path: pre-check OUTSIDE the transaction ─────────────────────────
+  // If the order is already captured AND the outbox event already exists there
+  // is nothing to write. Opening a $transaction only to hit a unique-constraint
+  // rollback wastes a DB connection and can leave an idle-in-transaction lock
+  // if the Netlify function times out before ROLLBACK is issued.
+  const existing = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { id: true, paymentStatus: true, authorizedAt: true },
+  });
+
+  if (!existing) throw new Error(`Order not found: ${orderId}`);
+
+  if (existing.paymentStatus === PaymentStatus.CAPTURED) {
+    console.log(`[OrderService] capturePayment: order already CAPTURED – skipping transaction for ${orderId}`);
+    // Fire outbox best-effort so the confirmation email retries if not sent yet.
+    processOutbox({ lockedBy: `capture-replay-${orderId}` }).catch((e) =>
+      console.error('[OrderService] processOutbox error on replay:', e),
+    );
+    return { orderId, alreadyCaptured: true };
+  }
+
+  // ── Normal path: order is NOT yet captured → open transaction ────────────
   try {
     await prisma.$transaction(async (tx) => {
-      // Read current state inside the transaction
+      // Re-read inside transaction to guard against concurrent captures.
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: { id: true, paymentStatus: true, authorizedAt: true },
@@ -55,8 +77,6 @@ export async function capturePayment(
 
       if (!order) throw new Error(`Order not found: ${orderId}`);
 
-      // Skip DB write if already captured, but still upsert the event so the
-      // outbox will re-attempt the email if confirmationEmailSentAt is null
       if (order.paymentStatus !== PaymentStatus.CAPTURED) {
         await tx.order.update({
           where: { id: orderId },
@@ -84,7 +104,7 @@ export async function capturePayment(
       console.log(`[OrderService] OUTBOX EVENT CREATED: ORDER_PAID ${orderId} ${idempotencyKey}`);
     });
   } catch (err: unknown) {
-    // Unique constraint on idempotencyKey → event already exists → order already processed
+    // Unique constraint on idempotencyKey → concurrent capture won the race
     if (isUniqueConstraintError(err)) {
       console.log(`[OrderService] capturePayment: idempotencyKey exists – no-op for ${orderId}`);
       return { orderId, alreadyCaptured: true };

@@ -43,15 +43,16 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // If already captured, capturePayment() is idempotent (no-op on DB, retries email via outbox).
-    // We still call through so the outbox can retry any unsent email.
+    // If already captured: do NOT call capturePayment() here – it would open
+    // a $transaction only to hit a unique-constraint rollback, and can leave
+    // an idle-in-transaction lock if the function times out.
+    // Fire processOutbox directly for best-effort email retry instead.
     if (order.paymentStatus === PaymentStatus.CAPTURED) {
-      console.log(`[Reconcile] Order ${orderId} already CAPTURED – delegating to capturePayment for outbox retry`);
-      try {
-        await capturePayment(orderId, order.providerPaymentId ?? paymentIntentId);
-      } catch (captureErr) {
-        console.error(`[Reconcile] capturePayment error (non-fatal) for ${orderId}:`, captureErr);
-      }
+      console.log(`[Reconcile] Order ${orderId} already CAPTURED – firing outbox directly for email retry`);
+      const { processOutbox } = await import('@/lib/outbox/processor');
+      processOutbox({ lockedBy: `reconcile-${orderId}` }).catch((e) =>
+        console.error('[Reconcile] processOutbox error:', e),
+      );
       return NextResponse.json({
         orderId,
         paymentStatus: order.paymentStatus,

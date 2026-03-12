@@ -17,9 +17,19 @@ const globalForPrisma = globalThis as unknown as {
 function buildDatabaseUrl(): string {
   const base = process.env.DATABASE_URL ?? '';
   if (!base) return base;
-  if (base.includes('pgbouncer=true')) return base;
-  const sep = base.includes('?') ? '&' : '?';
-  return `${base}${sep}pgbouncer=true`;
+  let url = base;
+  // Tell Prisma to use simple (non-prepared) queries – required for PgBouncer.
+  if (!url.includes('pgbouncer=true')) {
+    const sep = url.includes('?') ? '&' : '?';
+    url = `${url}${sep}pgbouncer=true`;
+  }
+  // Kill any idle-in-transaction sessions after 10 s at the DB level.
+  // This prevents leaked transactions (e.g. from timed-out Netlify functions)
+  // from holding row locks indefinitely.
+  if (!url.includes('idle_in_transaction_session_timeout')) {
+    url = `${url}&options=${encodeURIComponent('--idle_in_transaction_session_timeout=10000')}` ;
+  }
+  return url;
 }
 
 export const prisma: PrismaClient =
