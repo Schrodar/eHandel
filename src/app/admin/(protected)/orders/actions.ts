@@ -18,7 +18,6 @@ import { revalidatePath } from 'next/cache';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { prisma } from '@/lib/prisma';
 import { CheckoutOrderStatus, OrderStatus, PaymentStatus } from '@prisma/client';
-import { markShipped as serviceMarkShipped } from '@/lib/orders/service';
 
 export type OrderActionResult = {
   ok: boolean;
@@ -54,11 +53,25 @@ function assertFulfillable(order: {
 export async function startPicking(
   orderId: string,
 ): Promise<OrderActionResult> {
-  await requireAdminSession();
+  const startedAt = Date.now();
+  console.info('[admin/orders/startPicking] start', { orderId });
 
+  console.info('[admin/orders/startPicking] auth:begin', { orderId });
+  await requireAdminSession();
+  console.info('[admin/orders/startPicking] auth:done', {
+    orderId,
+    elapsedMs: Date.now() - startedAt,
+  });
+
+  console.info('[admin/orders/startPicking] db:findUnique:begin', { orderId });
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     select: { orderStatus: true, paymentStatus: true, status: true },
+  });
+  console.info('[admin/orders/startPicking] db:findUnique:done', {
+    orderId,
+    found: Boolean(order),
+    elapsedMs: Date.now() - startedAt,
   });
 
   if (!order) return { ok: false, message: 'Ordern hittades inte' };
@@ -78,13 +91,26 @@ export async function startPicking(
     return { ok: false, message: 'Ordern kan inte startas för plock' };
   }
 
+  console.info('[admin/orders/startPicking] db:update:begin', {
+    orderId,
+    nextStatus: OrderStatus.PICKING,
+  });
   await prisma.order.update({
     where: { id: orderId },
     data: { orderStatus: OrderStatus.PICKING },
   });
+  console.info('[admin/orders/startPicking] db:update:done', {
+    orderId,
+    elapsedMs: Date.now() - startedAt,
+  });
 
+  console.info('[admin/orders/startPicking] revalidate:begin', { orderId });
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath('/admin/orders');
+  console.info('[admin/orders/startPicking] done', {
+    orderId,
+    elapsedMs: Date.now() - startedAt,
+  });
   return { ok: true, message: 'Plockning startad' };
 }
 
@@ -156,6 +182,9 @@ export async function markShipped(params: {
   }
 
   try {
+    const { markShipped: serviceMarkShipped } = await import(
+      '@/lib/orders/service'
+    );
     await serviceMarkShipped(
       params.orderId,
       params.carrier.trim(),
@@ -208,6 +237,9 @@ export async function updateShipping(params: {
   }
 
   try {
+    const { markShipped: serviceMarkShipped } = await import(
+      '@/lib/orders/service'
+    );
     await serviceMarkShipped(
       params.orderId,
       params.carrier.trim(),
