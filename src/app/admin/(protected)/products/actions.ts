@@ -445,7 +445,7 @@ export async function createVariant(formData: FormData) {
 
   const stock = Number(stockRaw);
   if (!Number.isInteger(stock) || stock < 0) {
-    errors.stock = 'Stock måste vara ett heltal ≥ 0';
+    redirect(`/admin/products/${productId}?tab=variants&error=stock-invalid`);
   }
   if (size && size.length > MAX_VARIANT_SIZE_LENGTH) {
     errors.size = `Size får vara max ${MAX_VARIANT_SIZE_LENGTH} tecken`;

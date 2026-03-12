@@ -588,6 +588,13 @@ export default async function AdminProductDetailPage({
                     Stock måste vara ≥ 0 för att aktivera en variant.
                   </div>
                 </div>
+              ) : error === 'stock-invalid' ? (
+                <div>
+                  <div className="font-semibold">Ogiltigt stockvärde</div>
+                  <div className="mt-1">
+                    Stock måste vara ett heltal och kan inte vara mindre än 0.
+                  </div>
+                </div>
               ) : error === 'variant-product-mismatch' ? (
                 <div>
                   <div className="font-semibold">Fel produktkontext</div>
@@ -816,7 +823,7 @@ export default async function AdminProductDetailPage({
                           <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <AdminForm
                               action={updateVariant}
-                              className="grid gap-3 md:grid-cols-4"
+                              className="grid gap-3 md:grid-cols-5"
                               toastMessage="Sparat"
                               pendingMessage="Sparar…"
                               showOverlay={false}
@@ -827,12 +834,6 @@ export default async function AdminProductDetailPage({
                                 name="productId"
                                 value={product.id}
                               />
-                              <input
-                                type="hidden"
-                                name="stock"
-                                value={v.stock}
-                              />
-
                               <div>
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                   SKU
@@ -873,6 +874,20 @@ export default async function AdminProductDetailPage({
                                   name="size"
                                   defaultValue={v.size ?? ''}
                                   placeholder="Valfri storlek"
+                                  className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                  Stock
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  name="stock"
+                                  defaultValue={v.stock}
                                   className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                 />
                               </div>
@@ -927,6 +942,7 @@ export default async function AdminProductDetailPage({
                       <th className="px-3 py-2">SKU</th>
                       <th className="px-3 py-2">Color</th>
                       <th className="px-3 py-2">Storlek</th>
+                      <th className="px-3 py-2 text-right">Stock</th>
                       <th className="px-3 py-2 text-right">Price</th>
                       <th className="px-3 py-2 text-center">Badges</th>
                       <th className="px-3 py-2 text-center">Active</th>
@@ -982,6 +998,9 @@ export default async function AdminProductDetailPage({
                             </td>
                             <td className="px-3 py-2 text-[11px] text-slate-700">
                               {v.size ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 text-right text-[11px] tabular-nums text-slate-700">
+                              {v.stock}
                             </td>
                             <td className="px-3 py-2 text-right text-[11px] tabular-nums">
                               {effectivePriceLabel}
@@ -1093,10 +1112,10 @@ export default async function AdminProductDetailPage({
 
                           {isEditing && (
                             <tr className="border-b border-slate-100 last:border-0">
-                              <td colSpan={8} className="px-3 py-3 bg-slate-50">
+                              <td colSpan={9} className="px-3 py-3 bg-slate-50">
                                 <AdminForm
                                   action={updateVariant}
-                                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-4"
+                                  className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-5"
                                   toastMessage="Sparat"
                                   pendingMessage="Sparar…"
                                   showOverlay={false}
@@ -1107,12 +1126,6 @@ export default async function AdminProductDetailPage({
                                     name="productId"
                                     value={product.id}
                                   />
-                                  <input
-                                    type="hidden"
-                                    name="stock"
-                                    value={v.stock}
-                                  />
-
                                   <div>
                                     <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
                                       SKU
@@ -1153,6 +1166,20 @@ export default async function AdminProductDetailPage({
                                       name="size"
                                       defaultValue={v.size ?? ''}
                                       placeholder="Valfri storlek"
+                                      className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                                      Stock
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={1}
+                                      name="stock"
+                                      defaultValue={v.stock}
                                       className="w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-300"
                                     />
                                   </div>
