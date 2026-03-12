@@ -95,10 +95,56 @@ export async function startPicking(
     orderId,
     nextStatus: OrderStatus.PICKING,
   });
-  await prisma.order.update({
-    where: { id: orderId },
-    data: { orderStatus: OrderStatus.PICKING },
-  });
+
+  try {
+    const updateResult = await prisma.$transaction(async (tx) => {
+      // Fail-fast on row locks instead of waiting ~30s (Netlify function timeout).
+      await tx.$executeRaw`SET LOCAL lock_timeout = '1500ms'`;
+
+      return tx.order.updateMany({
+        where: {
+          id: orderId,
+          orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
+          paymentStatus: PaymentStatus.CAPTURED,
+          status: {
+            notIn: [
+              CheckoutOrderStatus.PENDING_PAYMENT,
+              CheckoutOrderStatus.CANCELLED,
+            ],
+          },
+        },
+        data: { orderStatus: OrderStatus.PICKING },
+      });
+    });
+
+    if (updateResult.count === 0) {
+      console.info('[admin/orders/startPicking] db:update:no-op', {
+        orderId,
+        elapsedMs: Date.now() - startedAt,
+      });
+      return {
+        ok: false,
+        message: 'Ordern uppdaterades inte (status kan ha ändrats av annan process)',
+      };
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[admin/orders/startPicking] db:update:error', {
+      orderId,
+      elapsedMs: Date.now() - startedAt,
+      message,
+    });
+
+    if (message.toLowerCase().includes('lock timeout')) {
+      return {
+        ok: false,
+        message: 'Ordern är låst av en annan process. Försök igen om några sekunder.',
+      };
+    }
+
+    return { ok: false, message: 'Kunde inte starta plock just nu' };
+  }
+
   console.info('[admin/orders/startPicking] db:update:done', {
     orderId,
     elapsedMs: Date.now() - startedAt,
