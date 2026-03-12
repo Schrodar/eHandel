@@ -97,28 +97,24 @@ export async function startPicking(
   });
 
   try {
-    // Use an explicit transaction so SET LOCAL statement_timeout is scoped to
-    // this connection/transaction only. PgBouncer (transaction pooling) holds
-    // the connection for the lifetime of the transaction so SET LOCAL is safe.
-    // 6 000 ms gives enough room for a brief background lock while still
-    // failing well before Netlify's 30 s function timeout.
-    const updateResult = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SET LOCAL statement_timeout = '6000ms'`;
-
-      return tx.order.updateMany({
-        where: {
-          id: orderId,
-          orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
-          paymentStatus: PaymentStatus.CAPTURED,
-          status: {
-            notIn: [
-              CheckoutOrderStatus.PENDING_PAYMENT,
-              CheckoutOrderStatus.CANCELLED,
-            ],
-          },
+    // Single-statement updateMany is atomic by itself – no interactive
+    // transaction needed. Prisma's interactive transactions have a hard 5 s
+    // default timeout that fires before any DB-level lock can even be detected,
+    // causing "Transaction already closed" errors. The WHERE guards below give
+    // the same race-safety as a transaction would.
+    const updateResult = await prisma.order.updateMany({
+      where: {
+        id: orderId,
+        orderStatus: { in: [OrderStatus.NEW, OrderStatus.READY_TO_PICK] },
+        paymentStatus: PaymentStatus.CAPTURED,
+        status: {
+          notIn: [
+            CheckoutOrderStatus.PENDING_PAYMENT,
+            CheckoutOrderStatus.CANCELLED,
+          ],
         },
-        data: { orderStatus: OrderStatus.PICKING },
-      });
+      },
+      data: { orderStatus: OrderStatus.PICKING },
     });
 
     if (updateResult.count === 0) {
